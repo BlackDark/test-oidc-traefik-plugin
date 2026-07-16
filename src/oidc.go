@@ -71,7 +71,7 @@ func randomBytesInHex(count int) (string, error) {
 	return hex.EncodeToString(buf), nil
 }
 
-func exchangeAuthCode(oidcAuth *TraefikOidcAuth, req *http.Request, authCode string) (*oidc.OidcTokenResponse, error) {
+func exchangeAuthCode(oidcAuth *TraefikOidcAuth, req *http.Request, authCode string, codeVerifierEnc string) (*oidc.OidcTokenResponse, error) {
 	redirectUrl := oidcAuth.GetAbsoluteCallbackURL(req).String()
 
 	urlValues := url.Values{
@@ -97,12 +97,11 @@ func exchangeAuthCode(oidcAuth *TraefikOidcAuth, req *http.Request, authCode str
 	}
 
 	if oidcAuth.Config.Provider.UsePkceBool {
-		codeVerifierCookie, err := req.Cookie(getCodeVerifierCookieName(oidcAuth.Config))
-		if err != nil {
-			return nil, err
+		if codeVerifierEnc == "" {
+			return nil, errors.New("missing PKCE code verifier in state")
 		}
 
-		codeVerifier, err := utils.Decrypt(codeVerifierCookie.Value, oidcAuth.Config.Secret)
+		codeVerifier, err := utils.Decrypt(codeVerifierEnc, oidcAuth.Config.Secret)
 		if err != nil {
 			return nil, err
 		}

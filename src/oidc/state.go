@@ -8,6 +8,10 @@ import (
 type OidcState struct {
 	Action      string `json:"action"`
 	RedirectUrl string `json:"redirect_url"`
+	// CodeVerifierEnc is the AES-GCM encrypted PKCE code_verifier (utils.Encrypt output).
+	// Nested inside JSON then RawURL-encoded by EncodeState — do not put Encrypt output bare in a query string.
+	// Carried in state so parallel login redirects cannot overwrite each other via a shared cookie.
+	CodeVerifierEnc string `json:"cve,omitempty"`
 }
 
 func EncodeState(state *OidcState) (string, error) {
