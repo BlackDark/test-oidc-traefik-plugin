@@ -73,7 +73,9 @@ http:
   throw new Error('Timeout occurred while waiting for Keycloak to start.');
 });
 
-test.afterEach('Traefik logs on test failure', async (_fixtures, testInfo) => {
+// Playwright requires fixture-object destructuring as the first callback arg.
+// biome-ignore lint/correctness/noEmptyPattern: Playwright fixture API
+test.afterEach('Traefik logs on test failure', async ({}, testInfo) => {
   if (testInfo.status !== testInfo.expectedStatus) {
     console.log(`${testInfo.title} failed, here are Traefik logs:`);
     console.log(await dockerCompose.logs('traefik', { cwd: __dirname }));
