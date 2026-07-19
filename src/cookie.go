@@ -28,7 +28,7 @@ func setChunkedCookies(config *config.Config, rw http.ResponseWriter, cookieName
 	} else {
 		c := baseCookie
 		c.Name = cookieName + ".Chunks"
-		c.Value = fmt.Sprintf("%d", len(cookieChunks))
+		c.Value = strconv.Itoa(len(cookieChunks))
 		http.SetCookie(rw, c)
 
 		for index, chunk := range cookieChunks {
@@ -38,6 +38,7 @@ func setChunkedCookies(config *config.Config, rw http.ResponseWriter, cookieName
 		}
 	}
 }
+
 func readChunkedCookie(req *http.Request, cookieName string) (string, error) {
 	chunkCount, err := getChunkedCookieCount(req, cookieName)
 	if err != nil {
@@ -55,21 +56,27 @@ func readChunkedCookie(req *http.Request, cookieName string) (string, error) {
 
 	value := ""
 
+	var valueSb58 strings.Builder
 	for i := 0; i < chunkCount; i++ {
 		cookie, err := req.Cookie(fmt.Sprintf("%s.%d", cookieName, i+1))
 		if err != nil {
 			return "", err
 		}
 
-		value += cookie.Value
+		valueSb58.WriteString(cookie.Value)
 	}
+	value += valueSb58.String()
 
 	return value, nil
 }
+
 func getChunkedCookieCount(req *http.Request, cookieName string) (int, error) {
-	chunksCookie, err := req.Cookie(fmt.Sprintf("%s.Chunks", cookieName))
+	chunksCookie, err := req.Cookie(cookieName + ".Chunks")
 	if err != nil {
-		return 0, nil
+		if errors.Is(err, http.ErrNoCookie) {
+			return 0, nil
+		}
+		return 0, err
 	}
 
 	chunkCount, err := strconv.Atoi(chunksCookie.Value)
@@ -79,22 +86,7 @@ func getChunkedCookieCount(req *http.Request, cookieName string) (int, error) {
 
 	return chunkCount, nil
 }
-func getChunkedCookieNames(req *http.Request, cookieName string) (map[string]struct{}, error) {
-	cookieNames := make(map[string]struct{})
-	chunkCount, err := getChunkedCookieCount(req, cookieName)
-	if err != nil {
-		return nil, err
-	}
-	if chunkCount == 0 {
-		cookieNames[cookieName] = struct{}{}
-	} else {
-		cookieNames[cookieName+".Chunks"] = struct{}{}
-		for i := 0; i < chunkCount; i++ {
-			cookieNames[fmt.Sprintf("%s.%d", cookieName, i+1)] = struct{}{}
-		}
-	}
-	return cookieNames, nil
-}
+
 func clearChunkedCookie(config *config.Config, rw http.ResponseWriter, req *http.Request, cookieName string) error {
 	chunkCount, err := getChunkedCookieCount(req, cookieName)
 	if err != nil {

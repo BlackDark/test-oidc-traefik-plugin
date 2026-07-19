@@ -45,14 +45,14 @@ type TraefikOidcAuth struct {
 // Make sure we fetch oidc discovery document during first request - avoid race condition
 // Perform lock when changing document - we are in concurrent environment
 func (toa *TraefikOidcAuth) EnsureOidcDiscovery() error {
-	var config = toa.Config
-	var parsedURL = toa.ProviderURL
+	config := toa.Config
+	parsedURL := toa.ProviderURL
 	if toa.DiscoveryDocument == nil {
 		toa.Lock.Lock()
 		defer toa.Lock.Unlock()
 		// check again after lock
 		if toa.DiscoveryDocument == nil {
-			var jwks = &oidc.JwksHandler{}
+			jwks := &oidc.JwksHandler{}
 			toa.Jwks = jwks
 			toa.logger.Log(logging.LevelInfo, "Getting OIDC discovery document...")
 
@@ -84,11 +84,11 @@ func (toa *TraefikOidcAuth) EnsureOidcDiscovery() error {
 func (toa *TraefikOidcAuth) GetAbsoluteCallbackURL(req *http.Request) *url.URL {
 	if utils.UrlIsAbsolute(toa.CallbackURL) {
 		return toa.CallbackURL
-	} else {
-		abs := *toa.CallbackURL
-		utils.FillHostSchemeFromRequest(req, &abs)
-		return &abs
 	}
+
+	abs := *toa.CallbackURL
+	utils.FillHostSchemeFromRequest(req, &abs)
+	return &abs
 }
 
 func (toa *TraefikOidcAuth) isCallbackRequest(req *http.Request) bool {
@@ -120,7 +120,6 @@ func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 	}
 
 	err := toa.EnsureOidcDiscovery()
-
 	if err != nil {
 		toa.logger.Log(logging.LevelError, "Error getting oidc discovery: %s", err.Error())
 		http.Error(rw, err.Error(), http.StatusInternalServerError)
@@ -179,22 +178,24 @@ func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 		toa.sanitizeForUpstream(req)
 		toa.next.ServeHTTP(rw, req)
 		return
-	} else if isPublic {
+	}
+
+	if isPublic {
 		toa.sanitizeForUpstream(req)
 		toa.next.ServeHTTP(rw, req)
 		return
-	} else {
-		if toa.Config.FrontChannelLogoutUri != "" && strings.HasPrefix(req.RequestURI, toa.Config.FrontChannelLogoutUri) {
-			// Idempotent: already logged out / no session. Do not clear cookies or require auth.
-			toa.writeSuccessfulLogout(rw, req)
-			return
-		}
-
-		toa.logger.Log(logging.LevelInfo, "Verifying token: %s", err.Error())
-
-		// Clear the session cookie
-		clearChunkedCookie(toa.Config, rw, req, getSessionCookieName(toa.Config))
 	}
+
+	if toa.Config.FrontChannelLogoutUri != "" && strings.HasPrefix(req.RequestURI, toa.Config.FrontChannelLogoutUri) {
+		// Idempotent: already logged out / no session. Do not clear cookies or require auth.
+		toa.writeSuccessfulLogout(rw, req)
+		return
+	}
+
+	toa.logger.Log(logging.LevelInfo, "Verifying token: %s", err.Error())
+
+	// Clear the session cookie
+	_ = clearChunkedCookie(toa.Config, rw, req, getSessionCookieName(toa.Config))
 
 	toa.handleUnauthenticated(rw, req)
 }
@@ -218,7 +219,7 @@ func (toa *TraefikOidcAuth) sanitizeForUpstream(req *http.Request) {
 
 func withSuffixPrefix(suffixPrefix string, values any, format string) any {
 	var result []string
-	var valueOf = reflect.ValueOf(values)
+	valueOf := reflect.ValueOf(values)
 	if valueOf.Kind() == reflect.Array || valueOf.Kind() == reflect.Slice {
 		for i := 0; i < valueOf.Len(); i++ {
 			result = append(result, fmt.Sprintf(format, fmt.Sprint(valueOf.Index(i)), suffixPrefix))
@@ -237,7 +238,7 @@ func newTemplate() *template.Template {
 			return withSuffixPrefix(suffix, values, "%[1]s%[2]s")
 		},
 		"mapToJsonArray": func(values any) string {
-			var valueOf = reflect.ValueOf(values)
+			valueOf := reflect.ValueOf(values)
 			var builder strings.Builder
 			builder.WriteRune('[')
 			if valueOf.Kind() == reflect.Array || valueOf.Kind() == reflect.Slice {
@@ -281,7 +282,6 @@ func (toa *TraefikOidcAuth) attachHeaders(req *http.Request, session *session.Se
 			if header.Value != "" {
 				if header.Template == nil {
 					tpl, err := newTemplate().Parse(header.Value)
-
 					if err != nil {
 						return err
 					}
@@ -300,7 +300,6 @@ func (toa *TraefikOidcAuth) attachHeaders(req *http.Request, session *session.Se
 			} else if header.Values != "" {
 				if header.Template == nil {
 					tpl, err := newTemplate().Parse(header.Values)
-
 					if err != nil {
 						return err
 					}
@@ -310,7 +309,6 @@ func (toa *TraefikOidcAuth) attachHeaders(req *http.Request, session *session.Se
 
 				var renderedValue bytes.Buffer
 				err := header.Template.Execute(&renderedValue, evalContext)
-
 				if err != nil {
 					req.Header.Set(header.Name, err.Error())
 				}
@@ -358,7 +356,8 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 
 	redirectUrl := state.RedirectUrl
 
-	if state.Action == "Login" {
+	switch state.Action {
+	case "Login":
 		if err := validateLoginCsrf(toa.Config, req, state.Csrf); err != nil {
 			toa.logger.Log(logging.LevelWarn, "Login CSRF validation failed: %s", err.Error())
 			clearLoginCsrfCookie(toa.Config, rw, toa.CallbackURL, state.Csrf)
@@ -383,13 +382,14 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 
 		usedToken := ""
 
-		if toa.Config.Provider.TokenValidation == "AccessToken" {
+		switch toa.Config.Provider.TokenValidation {
+		case "AccessToken":
 			usedToken = token.AccessToken
-		} else if toa.Config.Provider.TokenValidation == "IdToken" {
+		case "IdToken":
 			usedToken = token.IdToken
-		} else if toa.Config.Provider.TokenValidation == "Introspection" {
+		case "Introspection":
 			usedToken = token.AccessToken
-		} else {
+		default:
 			toa.logger.Log(logging.LevelError, "Invalid value '%s' for VerificationToken", toa.Config.Provider.TokenValidation)
 			http.Error(rw, err.Error(), http.StatusInternalServerError)
 		}
@@ -473,13 +473,12 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 			toa.handleUnauthorized(rw, req, session, redirectUrl)
 			return
 		}
-
-	} else if state.Action == "Logout" {
+	case "Logout":
 		toa.logger.Log(logging.LevelDebug, "Post logout. Clearing cookie.")
 
 		// Clear the cookie
-		clearChunkedCookie(toa.Config, rw, req, getSessionCookieName(toa.Config))
-	} else if state.Action == "RedirectThenLogin" {
+		_ = clearChunkedCookie(toa.Config, rw, req, getSessionCookieName(toa.Config))
+	case "RedirectThenLogin":
 		toa.redirectToProvider(rw, req, redirectUrl, state.IsChallenge)
 		return
 	}
@@ -553,7 +552,7 @@ func secureStringEqual(a, b string) bool {
 
 // handleFrontchannelLogout implements OpenID Connect Front-Channel Logout 1.0 with hardened checks.
 // Requires non-empty iss; never clears the session when iss is missing (fixes PR #216).
-func (toa *TraefikOidcAuth) handleFrontchannelLogout(rw http.ResponseWriter, req *http.Request, session *session.SessionState, claims map[string]interface{}) {
+func (toa *TraefikOidcAuth) handleFrontchannelLogout(rw http.ResponseWriter, req *http.Request, _ *session.SessionState, claims map[string]interface{}) {
 	toa.logger.Log(logging.LevelInfo, "Handling frontchannel logout...")
 
 	iss := req.URL.Query().Get("iss")
@@ -593,7 +592,7 @@ func (toa *TraefikOidcAuth) handleFrontchannelLogout(rw http.ResponseWriter, req
 		}
 	}
 
-	clearChunkedCookie(toa.Config, rw, req, getSessionCookieName(toa.Config))
+	_ = clearChunkedCookie(toa.Config, rw, req, getSessionCookieName(toa.Config))
 	toa.writeSuccessfulLogout(rw, req)
 }
 

@@ -73,7 +73,7 @@ func TestSetChunkedCookiesChunked(t *testing.T) {
 }
 
 func TestReadChunkedCookieOrdered(t *testing.T) {
-	req, err := http.NewRequest("GET", "https://example.com", nil)
+	req, err := http.NewRequest(http.MethodGet, "https://example.com", nil)
 	if err != nil {
 		t.Fail()
 	}
@@ -106,7 +106,7 @@ func TestReadChunkedCookieOrdered(t *testing.T) {
 }
 
 func TestReadChunkedCookieUnordered(t *testing.T) {
-	req, err := http.NewRequest("GET", "https://example.com", nil)
+	req, err := http.NewRequest(http.MethodGet, "https://example.com", nil)
 	if err != nil {
 		t.Fail()
 	}
@@ -139,7 +139,7 @@ func TestReadChunkedCookieUnordered(t *testing.T) {
 }
 
 func TestReadChunkedCookieWithIncompleteChunks(t *testing.T) {
-	req, err := http.NewRequest("GET", "https://example.com", nil)
+	req, err := http.NewRequest(http.MethodGet, "https://example.com", nil)
 	if err != nil {
 		t.Fail()
 	}
@@ -166,7 +166,7 @@ func TestReadChunkedCookieWithIncompleteChunks(t *testing.T) {
 }
 
 func TestReadChunkedCookieWithNoCount(t *testing.T) {
-	req, err := http.NewRequest("GET", "https://example.com", nil)
+	req, err := http.NewRequest(http.MethodGet, "https://example.com", nil)
 	if err != nil {
 		t.Fail()
 	}
@@ -205,9 +205,11 @@ func newMockResponseWriter() *mockResponseWriter {
 func (writer *mockResponseWriter) Header() http.Header {
 	return writer.HeaderMap
 }
+
 func (writer *mockResponseWriter) Write([]byte) (int, error) {
 	return 0, nil
 }
+
 func (writer *mockResponseWriter) WriteHeader(statusCode int) {
 }
 
@@ -228,7 +230,7 @@ func TestClearLegacyCodeVerifierCookies_ExpiresHostnameAndHostOnly(t *testing.T)
 		t.Fatal(err)
 	}
 	rw := newMockResponseWriter()
-	req, err := http.NewRequest("GET", "https://app.example.com:8443/oidc/callback", nil)
+	req, err := http.NewRequest(http.MethodGet, "https://app.example.com:8443/oidc/callback", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -266,27 +268,27 @@ func TestValidateLoginCsrf(t *testing.T) {
 	csrf := "abc123csrfvalue"
 
 	t.Run("ok", func(t *testing.T) {
-		req := httptest.NewRequest("GET", "https://app.example.com/oidc/callback", nil)
+		req := httptest.NewRequest(http.MethodGet, "https://app.example.com/oidc/callback", nil)
 		req.AddCookie(&http.Cookie{Name: getLoginCsrfCookieName(cfg, csrf), Value: csrf})
 		if err := validateLoginCsrf(cfg, req, csrf); err != nil {
 			t.Fatal(err)
 		}
 	})
 	t.Run("missing_cookie", func(t *testing.T) {
-		req := httptest.NewRequest("GET", "https://app.example.com/oidc/callback", nil)
+		req := httptest.NewRequest(http.MethodGet, "https://app.example.com/oidc/callback", nil)
 		if err := validateLoginCsrf(cfg, req, csrf); err == nil {
 			t.Fatal("expected error")
 		}
 	})
 	t.Run("mismatch", func(t *testing.T) {
-		req := httptest.NewRequest("GET", "https://app.example.com/oidc/callback", nil)
+		req := httptest.NewRequest(http.MethodGet, "https://app.example.com/oidc/callback", nil)
 		req.AddCookie(&http.Cookie{Name: getLoginCsrfCookieName(cfg, csrf), Value: "other"})
 		if err := validateLoginCsrf(cfg, req, csrf); err == nil {
 			t.Fatal("expected error")
 		}
 	})
 	t.Run("missing_state_csrf", func(t *testing.T) {
-		req := httptest.NewRequest("GET", "https://app.example.com/oidc/callback", nil)
+		req := httptest.NewRequest(http.MethodGet, "https://app.example.com/oidc/callback", nil)
 		if err := validateLoginCsrf(cfg, req, ""); err == nil {
 			t.Fatal("expected error")
 		}

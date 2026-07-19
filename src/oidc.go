@@ -1,6 +1,7 @@
 package src
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/subtle"
 	"encoding/hex"
@@ -15,6 +16,7 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+
 	"github.com/BlackDark/test-oidc-traefik-plugin/src/logging"
 	"github.com/BlackDark/test-oidc-traefik-plugin/src/oidc"
 	"github.com/BlackDark/test-oidc-traefik-plugin/src/utils"
@@ -35,8 +37,13 @@ func GetOidcDiscovery(logger *logging.Logger, httpClient *http.Client, providerU
 	// client := &http.Client{Transport: tr}
 
 	// Make HTTP GET request to the OpenID provider's discovery endpoint
-	resp, err := httpClient.Get(wellKnownUrl.String())
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, wellKnownUrl.String(), nil)
+	if err != nil {
+		logger.Log(logging.LevelError, "http-get discovery endpoints - Err: %s", err.Error())
+		return nil, errors.New("HTTP GET error")
+	}
 
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		logger.Log(logging.LevelError, "http-get discovery endpoints - Err: %s", err.Error())
 		return nil, errors.New("HTTP GET error")
@@ -53,7 +60,6 @@ func GetOidcDiscovery(logger *logging.Logger, httpClient *http.Client, providerU
 	// Decode the JSON response
 	document := oidc.OidcDiscovery{}
 	err = json.NewDecoder(resp.Body).Decode(&document)
-
 	if err != nil {
 		logger.Log(logging.LevelError, "Failed to decode OIDC discovery document. Status code: %s", err.Error())
 		return &document, errors.New("Failed to decode OIDC discovery document. Status code: " + err.Error())
@@ -66,7 +72,7 @@ func randomBytesInHex(count int) (string, error) {
 	buf := make([]byte, count)
 	_, err := io.ReadFull(rand.Reader, buf)
 	if err != nil {
-		return "", fmt.Errorf("could not generate %d random bytes: %v", count, err)
+		return "", fmt.Errorf("could not generate %d random bytes: %w", count, err)
 	}
 
 	return hex.EncodeToString(buf), nil
@@ -110,8 +116,14 @@ func exchangeAuthCode(oidcAuth *TraefikOidcAuth, req *http.Request, authCode str
 		urlValues.Add("code_verifier", codeVerifier)
 	}
 
-	resp, err := oidcAuth.httpClient.PostForm(oidcAuth.DiscoveryDocument.TokenEndpoint, urlValues)
+	tokenReq, err := http.NewRequestWithContext(context.Background(), http.MethodPost, oidcAuth.DiscoveryDocument.TokenEndpoint, strings.NewReader(urlValues.Encode()))
+	if err != nil {
+		oidcAuth.logger.Log(logging.LevelError, "exchangeAuthCode: couldn't create token request: %s", err.Error())
+		return nil, err
+	}
+	tokenReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
+	resp, err := oidcAuth.httpClient.Do(tokenReq)
 	if err != nil {
 		oidcAuth.logger.Log(logging.LevelError, "exchangeAuthCode: couldn't POST to Provider: %s", err.Error())
 		return nil, err
@@ -159,7 +171,6 @@ func (toa *TraefikOidcAuth) validateTokenLocally(tokenString string, expectedNon
 	parser := jwt.NewParser(options...)
 
 	_, err = parser.ParseWithClaims(tokenString, claims, toa.Jwks.Keyfunc)
-
 	if err != nil {
 		// If the token is expired, reloading JWKS won't help — skip the retry.
 		if isTokenExpiredError(err) {
@@ -174,7 +185,6 @@ func (toa *TraefikOidcAuth) validateTokenLocally(tokenString string, expectedNon
 		}
 
 		_, err = parser.ParseWithClaims(tokenString, claims, toa.Jwks.Keyfunc)
-
 		if err != nil {
 			if isTokenExpiredError(err) {
 				toa.logger.Log(logging.LevelInfo, "The token is expired.")
@@ -223,20 +233,20 @@ func (toa *TraefikOidcAuth) introspectToken(token string) (bool, map[string]inte
 		data.Add("client_assertion", clientAssertionToken)
 	}
 
-	//log(toa.Config.LogLevel, LogLevelDebug, "Token: %s", token)
+	// log(toa.Config.LogLevel, LogLevelDebug, "Token: %s", token)
 
 	endpoint := toa.DiscoveryDocument.IntrospectionEndpoint
 
-	//if endpoint == "" {
+	// if endpoint == "" {
 	//	endpoint = toa.DiscoveryDocument.UserinfoEndpoint
 	//}
 
-	req, err := http.NewRequest(
+	req, err := http.NewRequestWithContext(
+		context.Background(),
 		http.MethodPost,
 		endpoint,
 		strings.NewReader(data.Encode()),
 	)
-
 	if err != nil {
 		return false, nil, err
 	}
@@ -254,20 +264,23 @@ func (toa *TraefikOidcAuth) introspectToken(token string) (bool, map[string]inte
 
 	var introspectResponse map[string]interface{}
 	err = json.NewDecoder(resp.Body).Decode(&introspectResponse)
-
 	if err != nil {
 		toa.logger.Log(logging.LevelError, "Failed to decode introspection response: %s", err.Error())
 		return false, nil, err
 	}
 
 	// TODO: Remove
-	//toa.logAvailableClaims(introspectResponse)
+	// toa.logAvailableClaims(introspectResponse)
 
 	if introspectResponse["active"] != nil {
-		return introspectResponse["active"].(bool), introspectResponse, nil
-	} else {
-		return false, nil, errors.New("received invalid introspection response")
+		active, ok := introspectResponse["active"].(bool)
+		if !ok {
+			return false, nil, errors.New("received invalid introspection response")
+		}
+		return active, introspectResponse, nil
 	}
+
+	return false, nil, errors.New("received invalid introspection response")
 }
 
 func (toa *TraefikOidcAuth) renewToken(refreshToken string) (*oidc.OidcTokenResponse, error) {
@@ -283,8 +296,14 @@ func (toa *TraefikOidcAuth) renewToken(refreshToken string) (*oidc.OidcTokenResp
 		urlValues.Add("client_secret", toa.Config.Provider.ClientSecret)
 	}
 
-	resp, err := toa.httpClient.PostForm(toa.DiscoveryDocument.TokenEndpoint, urlValues)
+	tokenReq, err := http.NewRequestWithContext(context.Background(), http.MethodPost, toa.DiscoveryDocument.TokenEndpoint, strings.NewReader(urlValues.Encode()))
+	if err != nil {
+		toa.logger.Log(logging.LevelError, "renewToken: couldn't create token request: %s", err.Error())
+		return nil, err
+	}
+	tokenReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
+	resp, err := toa.httpClient.Do(tokenReq)
 	if err != nil {
 		toa.logger.Log(logging.LevelError, "renewToken: couldn't POST to Provider: %s", err.Error())
 		return nil, err
@@ -332,7 +351,7 @@ func (toa *TraefikOidcAuth) getUserInfo(accessToken string, idTokenSubject strin
 		return nil, errors.New("userinfo_endpoint is not set")
 	}
 
-	req, err := http.NewRequest("GET", toa.DiscoveryDocument.UserinfoEndpoint, nil)
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, toa.DiscoveryDocument.UserinfoEndpoint, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -380,7 +399,6 @@ func (toa *TraefikOidcAuth) getUserInfo(accessToken string, idTokenSubject strin
 		parser := jwt.NewParser(options...)
 
 		_, err = parser.ParseWithClaims(tokenString, claims, toa.Jwks.Keyfunc)
-
 		if err != nil {
 			// If the token is expired, reloading JWKS won't help — skip the retry.
 			if isTokenExpiredError(err) {
@@ -394,7 +412,6 @@ func (toa *TraefikOidcAuth) getUserInfo(accessToken string, idTokenSubject strin
 			}
 
 			_, err = parser.ParseWithClaims(tokenString, claims, toa.Jwks.Keyfunc)
-
 			if err != nil {
 				toa.logger.Log(logging.LevelError, "Failed to parse userinfo token: %v", err)
 				return nil, err

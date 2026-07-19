@@ -1,0 +1,90 @@
+version: "2"
+
+run:
+  modules-download-mode: readonly
+
+linters:
+  default: standard
+  enable:
+    - bodyclose
+    - copyloopvar
+    - durationcheck
+    - errname
+    - errorlint
+    - forcetypeassert
+    - gocritic
+    - misspell
+    - nilerr
+    - nilnesserr
+    - noctx
+    - perfsprint
+    - prealloc
+    - reassign
+    - revive
+    - unconvert
+    - unparam
+    - usestdlibvars
+    - whitespace
+  settings:
+    revive:
+      rules:
+        - name: blank-imports
+        - name: context-as-argument
+        - name: context-keys-type
+        - name: dot-imports
+        - name: error-return
+        - name: error-strings
+        - name: error-naming
+        - name: if-return
+        - name: increment-decrement
+        - name: var-declaration
+        - name: range
+        - name: receiver-naming
+        - name: time-naming
+        - name: indent-error-flow
+        - name: errorf
+        - name: empty-block
+        - name: superfluous-else
+        - name: unreachable-code
+        - name: redefines-builtin-id
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    rules:
+      - path: _test\.go
+        linters:
+          - errcheck
+          - forcetypeassert
+          - noctx
+          - unparam
+      - text: "ifElseChain"
+        linters:
+          - gocritic
+      - text: "unlambda"
+        linters:
+          - gocritic
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+      - vendor$
+
+formatters:
+  enable:
+    - gofumpt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/BlackDark/test-oidc-traefik-plugin
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+      - vendor$

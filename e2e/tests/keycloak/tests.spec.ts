@@ -1,21 +1,21 @@
-import { test, expect, Page, Response } from "@playwright/test";
-import * as dockerCompose from "docker-compose";
-import { configureTraefik } from "../../utils";
-import fs from "fs";
-import path from "path";
+import fs from 'node:fs';
+import path from 'node:path';
+import { expect, type Page, type Response, test } from '@playwright/test';
+import * as dockerCompose from 'docker-compose';
+import { configureTraefik } from '../../utils';
 
 //-----------------------------------------------------------------------------
 // Test Setup
 //-----------------------------------------------------------------------------
 
 test.use({
-  ignoreHTTPSErrors: true
+  ignoreHTTPSErrors: true,
 });
 
-test.beforeAll("Starting traefik", async () => {
+test.beforeAll('Starting traefik', async () => {
   test.setTimeout(300000);
 
-  process.env["NODE_TLS_REJECT_UNAUTHORIZED"] = "0";
+  process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
   await configureTraefik(`
 http:
@@ -52,41 +52,39 @@ http:
 
   await dockerCompose.upAll({
     cwd: __dirname,
-    log: true
+    log: true,
   });
 
   // Wait some time for keycloak to start
-  for(let i = 0; i < 300; i++) {
-    console.log("Waiting for Keycloak...");
-    
-    await new Promise(r => setTimeout(r, 1000));
+  for (let i = 0; i < 300; i++) {
+    console.log('Waiting for Keycloak...');
+
+    await new Promise((r) => setTimeout(r, 1000));
 
     try {
-      const response = await fetch("https://localhost:9000/health/ready", {
-        method: "HEAD"
+      const response = await fetch('https://localhost:9000/health/ready', {
+        method: 'HEAD',
       });
 
-      if (response.status === 200)
-        return;
-    }
-    catch {}
+      if (response.status === 200) return;
+    } catch {}
   }
 
-  throw new Error("Timeout occurred while waiting for Keycloak to start.");
+  throw new Error('Timeout occurred while waiting for Keycloak to start.');
 });
 
-test.afterEach("Traefik logs on test failure", async ({}, testInfo) => {
+test.afterEach('Traefik logs on test failure', async (_fixtures, testInfo) => {
   if (testInfo.status !== testInfo.expectedStatus) {
     console.log(`${testInfo.title} failed, here are Traefik logs:`);
-    console.log(await dockerCompose.logs("traefik", { cwd: __dirname }));
-    console.log(await dockerCompose.logs("keycloak", { cwd: __dirname }));
+    console.log(await dockerCompose.logs('traefik', { cwd: __dirname }));
+    console.log(await dockerCompose.logs('keycloak', { cwd: __dirname }));
   }
 });
 
-test.afterAll("Stopping traefik", async () => {
+test.afterAll('Stopping traefik', async () => {
   await dockerCompose.downAll({
     cwd: __dirname,
-    log: true
+    log: true,
   });
 });
 
@@ -94,36 +92,38 @@ test.afterAll("Stopping traefik", async () => {
 // Tests
 //-----------------------------------------------------------------------------
 
-test("login http", async ({ page }) => {
-  await expectGotoOkay(page, "http://localhost:9080");
+test('login http', async ({ page }) => {
+  await expectGotoOkay(page, 'http://localhost:9080');
 
-  const response = await login(page, "admin", "admin", "http://localhost:9080");
-
-  expect(response.status()).toBe(200);
-});
-
-test("login https", async ({ page }) => {
-  await expectGotoOkay(page, "https://localhost:9443");
-
-  const response = await login(page, "admin", "admin", "https://localhost:9443");
+  const response = await login(page, 'admin', 'admin', 'http://localhost:9080');
 
   expect(response.status()).toBe(200);
 });
 
-test("logout", async ({ page }) => {
-  await expectGotoOkay(page, "http://localhost:9080");
+test('login https', async ({ page }) => {
+  await expectGotoOkay(page, 'https://localhost:9443');
 
-  const response = await login(page, "admin", "admin", "http://localhost:9080");
+  const response = await login(page, 'admin', 'admin', 'https://localhost:9443');
+
+  expect(response.status()).toBe(200);
+});
+
+test('logout', async ({ page }) => {
+  await expectGotoOkay(page, 'http://localhost:9080');
+
+  const response = await login(page, 'admin', 'admin', 'http://localhost:9080');
 
   expect(response.status()).toBe(200);
 
-  const logoutResponse = await page.goto("http://localhost:9080/logout");
+  const logoutResponse = await page.goto('http://localhost:9080/logout');
 
   // After logout we should be at the login page again
-  expect(logoutResponse?.url()).toMatch(/http:\/\/localhost:8000\/realms\/master\/protocol\/openid-connect\/auth.*/);
+  expect(logoutResponse?.url()).toMatch(
+    /http:\/\/localhost:8000\/realms\/master\/protocol\/openid-connect\/auth.*/,
+  );
 });
 
-test("test two services is seamless", async ({ page }) => {
+test('test two services is seamless', async ({ page }) => {
   await configureTraefik(`
 http:
   services:
@@ -162,19 +162,18 @@ http:
 
 `);
 
-  await expectGotoOkay(page, "http://localhost:9080/");
+  await expectGotoOkay(page, 'http://localhost:9080/');
 
-  const response = await login(page, "admin", "admin", "http://localhost:9080");
+  const response = await login(page, 'admin', 'admin', 'http://localhost:9080');
 
   expect(response.status()).toBe(200);
 
-  const otherSvcResp = await page.goto("http://localhost:9080/other");
-  expect(otherSvcResp!.status()).toBe(418);
-  expect(otherSvcResp!.request().redirectedFrom()).toBeNull();
+  const otherSvcResp = await page.goto('http://localhost:9080/other');
+  expect(otherSvcResp?.status()).toBe(418);
+  expect(otherSvcResp?.request().redirectedFrom()).toBeNull();
 });
 
-
-test("test headers", async ({ page }) => {
+test('test headers', async ({ page }) => {
   await configureTraefik(`
 http:
   services:
@@ -207,9 +206,9 @@ http:
       middlewares: ["oidc-auth@file"]
 `);
 
-  await expectGotoOkay(page, "http://localhost:9080");
+  await expectGotoOkay(page, 'http://localhost:9080');
 
-  const response = await login(page, "admin", "admin", "http://localhost:9080");
+  const response = await login(page, 'admin', 'admin', 'http://localhost:9080');
 
   expect(response.status()).toBe(200);
 
@@ -220,11 +219,11 @@ http:
   expect(staticHeaderExists).toBeTruthy();
 
   // Authorization cookie should not be present in the rendered contents
-  const pageText = await page.innerText("html");
+  const pageText = await page.innerText('html');
   expect(pageText).not.toMatch(/Cookie:\s*(?:^|\s|;)\s*Authorization\s*=\s*[^;\r\n]+/);
 });
 
-test("test authorization", async ({ page }) => {
+test('test authorization', async ({ page }) => {
   await configureTraefik(`
 http:
   services:
@@ -256,14 +255,14 @@ http:
       middlewares: ["oidc-auth@file"]
 `);
 
-  await expectGotoOkay(page, "http://localhost:9080");
+  await expectGotoOkay(page, 'http://localhost:9080');
 
-  const response = await login(page, "alice@example.com", "alice123", "http://localhost:9080");
+  const response = await login(page, 'alice@example.com', 'alice123', 'http://localhost:9080');
 
   expect(response.status()).toBe(200);
 });
 
-test("test authorization failing", async ({ page }) => {
+test('test authorization failing', async ({ page }) => {
   await configureTraefik(`
 http:
   services:
@@ -295,16 +294,23 @@ http:
       middlewares: ["oidc-auth@file"]
 `);
 
-  await expectGotoOkay(page, "http://localhost:9080");
+  await expectGotoOkay(page, 'http://localhost:9080');
 
-  const response = await login(page, "bob@example.com", "bob123", "http://localhost:9080/oidc/callback**");
+  const response = await login(
+    page,
+    'bob@example.com',
+    'bob123',
+    'http://localhost:9080/oidc/callback**',
+  );
 
   expect(response.status()).toBe(403);
 
-  expect(await response.text()).toContain("It seems like your account is not allowed to access this resource.");
+  expect(await response.text()).toContain(
+    'It seems like your account is not allowed to access this resource.',
+  );
 });
 
-test("login at provider via self signed certificate from file", async ({ page }) => {
+test('login at provider via self signed certificate from file', async ({ page }) => {
   await configureTraefik(`
 http:
   services:
@@ -339,16 +345,16 @@ http:
       middlewares: ["oidc-auth@file"]
 `);
 
-  await expectGotoOkay(page, "https://localhost:9443");
+  await expectGotoOkay(page, 'https://localhost:9443');
 
-  const response = await login(page, "admin", "admin", "https://localhost:9443");
+  const response = await login(page, 'admin', 'admin', 'https://localhost:9443');
 
   expect(response.status()).toBe(200);
 });
 
-test("login at provider via self signed inline certificate", async ({ page }) => {
-  const certBundle = fs.readFileSync(path.join(__dirname, "./certificates/bundle/ca_bundle.pem"));
-  const base64CertBundle = certBundle.toString("base64");
+test('login at provider via self signed inline certificate', async ({ page }) => {
+  const certBundle = fs.readFileSync(path.join(__dirname, './certificates/bundle/ca_bundle.pem'));
+  const base64CertBundle = certBundle.toString('base64');
 
   await configureTraefik(`
 http:
@@ -384,14 +390,14 @@ http:
       middlewares: ["oidc-auth@file"]
 `);
 
-  await expectGotoOkay(page, "https://localhost:9443");
+  await expectGotoOkay(page, 'https://localhost:9443');
 
-  const response = await login(page, "admin", "admin", "https://localhost:9443");
+  const response = await login(page, 'admin', 'admin', 'https://localhost:9443');
 
   expect(response.status()).toBe(200);
 });
 
-test("access app with bypass rule", async ({ page }) => {
+test('access app with bypass rule', async ({ page }) => {
   await configureTraefik(`
 http:
   services:
@@ -422,40 +428,42 @@ http:
 `);
 
   // The first test should bypass authentication and directly return the whoami page.
-  await page.route("http://localhost:9080/**/*", route => {
+  await page.route('http://localhost:9080/**/*', (route) => {
     const headers = route.request().headers();
-    headers["MY-HEADER"] = "123";
+    headers['MY-HEADER'] = '123';
 
     route.continue({ headers });
   });
-  
-  await page.goto("http://localhost:9080/test1");
+
+  await page.goto('http://localhost:9080/test1');
 
   await expect(page.getByText(/My-Header: 123/i)).toBeVisible();
 
   // The second test: authenticated user should not have authentication headers set
-  await expectGotoOkay(page, "http://localhost:9080/login");
-  await login(page, "admin", "admin", "http://localhost:9080");
+  await expectGotoOkay(page, 'http://localhost:9080/login');
+  await login(page, 'admin', 'admin', 'http://localhost:9080');
 
   const authHeaderExists = await page.locator(`text=Authorization: Bearer: ey`).isVisible();
   expect(authHeaderExists).toBeFalsy();
 
-  await page.goto("http://localhost:9080/logout");
+  await page.goto('http://localhost:9080/logout');
 
   // The third test should return a redirect to the IDP, because the header doesn't match.
-  await page.route("http://localhost:9080/**/*", route => {
+  await page.route('http://localhost:9080/**/*', (route) => {
     const headers = route.request().headers();
-    headers["MY-HEADER"] = "456";
+    headers['MY-HEADER'] = '456';
 
     route.continue({ headers });
   });
 
-  const response = await page.goto("http://localhost:9080/test2");
+  const response = await page.goto('http://localhost:9080/test2');
 
-  expect(response?.url()).toMatch(/http:\/\/localhost:8000\/realms\/master\/protocol\/openid-connect\/auth.*/);
+  expect(response?.url()).toMatch(
+    /http:\/\/localhost:8000\/realms\/master\/protocol\/openid-connect\/auth.*/,
+  );
 });
 
-test("access app with bypass rule and unauthenticated forward", async ({ page }) => {
+test('access app with bypass rule and unauthenticated forward', async ({ page }) => {
   await configureTraefik(`
 http:
   services:
@@ -491,7 +499,7 @@ http:
 `);
 
   // The first test: unauthenticated request should pass through directly to the whoami page.
-  const unauthResponse = await page.goto("http://localhost:9080/test1");
+  const unauthResponse = await page.goto('http://localhost:9080/test1');
 
   // Unauthenticated request passes through with a 200 response and no Authorization header attached.
   expect(unauthResponse?.status()).toBe(200);
@@ -499,14 +507,14 @@ http:
   expect(unauthAuthHeaderExists).toBeFalsy();
 
   // The second test: authenticated user should pass through with the Authorization header set.
-  await expectGotoOkay(page, "http://localhost:9080/login");
-  await login(page, "admin", "admin", "http://localhost:9080");
+  await expectGotoOkay(page, 'http://localhost:9080/login');
+  await login(page, 'admin', 'admin', 'http://localhost:9080');
 
   const authHeaderExists = await page.locator(`text=Authorization: Bearer: ey`).isVisible();
   expect(authHeaderExists).toBeTruthy();
 });
 
-test("external authentication", async ({ page }) => {
+test('external authentication', async ({ page }) => {
   await configureTraefik(`
     http:
       services:
@@ -539,52 +547,52 @@ test("external authentication", async ({ page }) => {
           middlewares: ["oidc-auth@file"]
   `);
 
-  const token = await loginAndGetToken(page, "admin", "admin");
+  const token = await loginAndGetToken(page, 'admin', 'admin');
 
-  const response1 = await fetch("http://localhost:9080", {
-    method: "GET"
+  const response1 = await fetch('http://localhost:9080', {
+    method: 'GET',
   });
 
   expect(response1.status).toBe(401);
 
-  const response2 = await fetch("http://localhost:9080", {
-    method: "GET",
-    "headers": {
-      CustomAuth: token
-    }
+  const response2 = await fetch('http://localhost:9080', {
+    method: 'GET',
+    headers: {
+      CustomAuth: token,
+    },
   });
 
   expect(response2.status).toBe(200);
 
-  const response3 = await fetch("http://localhost:9080", {
-    method: "GET",
-    "headers": {
-      CustomAuth: "wrong value"
-    }
+  const response3 = await fetch('http://localhost:9080', {
+    method: 'GET',
+    headers: {
+      CustomAuth: 'wrong value',
+    },
   });
 
   expect(response3.status).toBe(401);
 
-  const response4 = await fetch("http://localhost:9080", {
-    method: "GET",
-    "headers": {
-      Cookie: `CustomAuth=${token}`
-    }
+  const response4 = await fetch('http://localhost:9080', {
+    method: 'GET',
+    headers: {
+      Cookie: `CustomAuth=${token}`,
+    },
   });
 
   expect(response4.status).toBe(200);
 
-  const response5 = await fetch("http://localhost:9080", {
-    method: "GET",
-    "headers": {
-      Cookie: `CustomAuth=wrong-value`
-    }
+  const response5 = await fetch('http://localhost:9080', {
+    method: 'GET',
+    headers: {
+      Cookie: `CustomAuth=wrong-value`,
+    },
   });
 
   expect(response5.status).toBe(401);
 });
 
-test("external authentication with authorization rules", async ({ page }) => {
+test('external authentication with authorization rules', async ({ page }) => {
   await configureTraefik(`
     http:
       services:
@@ -619,32 +627,32 @@ test("external authentication with authorization rules", async ({ page }) => {
           middlewares: ["oidc-auth@file"]
   `);
 
-  const aliceToken = await loginAndGetToken(page, "alice@example.com", "alice123");
+  const aliceToken = await loginAndGetToken(page, 'alice@example.com', 'alice123');
 
-  const response1 = await fetch("http://localhost:9080", {
-    method: "GET",
-    "headers": {
-      CustomAuth: aliceToken
-    }
+  const response1 = await fetch('http://localhost:9080', {
+    method: 'GET',
+    headers: {
+      CustomAuth: aliceToken,
+    },
   });
 
   // Alice should be authorized, based on AssertClaims
   expect(response1.status).toBe(200);
 
-  const bobToken = await loginAndGetToken(page, "bob@example.com", "bob123");
+  const bobToken = await loginAndGetToken(page, 'bob@example.com', 'bob123');
 
-  const response2 = await fetch("http://localhost:9080", {
-    method: "GET",
-    "headers": {
-      CustomAuth: bobToken
-    }
+  const response2 = await fetch('http://localhost:9080', {
+    method: 'GET',
+    headers: {
+      CustomAuth: bobToken,
+    },
   });
 
   // but bob should not be authorized
   expect(response2.status).toBe(403);
 });
 
-test("test authorization custom error page", async ({ page }) => {
+test('test authorization custom error page', async ({ page }) => {
   await configureTraefik(`
 http:
   services:
@@ -679,16 +687,21 @@ http:
       middlewares: ["oidc-auth@file"]
 `);
 
-  await expectGotoOkay(page, "http://localhost:9080");
+  await expectGotoOkay(page, 'http://localhost:9080');
 
-  const response = await login(page, "bob@example.com", "bob123", "http://localhost:9080/oidc/callback**");
+  const response = await login(
+    page,
+    'bob@example.com',
+    'bob123',
+    'http://localhost:9080/oidc/callback**',
+  );
 
   expect(response.status()).toBe(403);
 
-  expect(await response.text()).toContain("CUSTOM ERROR PAGE");
+  expect(await response.text()).toContain('CUSTOM ERROR PAGE');
 });
 
-test("test authorization error redirect", async ({ page }) => {
+test('test authorization error redirect', async ({ page }) => {
   await configureTraefik(`
 http:
   services:
@@ -723,16 +736,21 @@ http:
       middlewares: ["oidc-auth@file"]
 `);
 
-  await expectGotoOkay(page, "http://localhost:9080");
+  await expectGotoOkay(page, 'http://localhost:9080');
 
-  const response = await login(page, "bob@example.com", "bob123", "http://localhost:9080/oidc/callback**");
+  const response = await login(
+    page,
+    'bob@example.com',
+    'bob123',
+    'http://localhost:9080/oidc/callback**',
+  );
 
   expect(response.status()).toBe(302);
-  expect(await response.headerValue("Location")).toBe("https://httpbin.org/unauthorized");
+  expect(await response.headerValue('Location')).toBe('https://httpbin.org/unauthorized');
 });
 
-test("test CheckOnEveryRequest", async ({ page }) => {
-   await configureTraefik(`
+test('test CheckOnEveryRequest', async ({ page }) => {
+  await configureTraefik(`
 http:
   services:
     whoami:
@@ -804,25 +822,34 @@ http:
       middlewares: ["auth-alice"]
       service: whoami
 `);
-  await expectGotoOkay(page, "http://localhost:9080/alice");
+  await expectGotoOkay(page, 'http://localhost:9080/alice');
 
-  const response = await login(page, "alice@example.com", "alice123", "http://localhost:9080/alice");
+  const response = await login(
+    page,
+    'alice@example.com',
+    'alice123',
+    'http://localhost:9080/alice',
+  );
   expect(response.status()).toBe(200);
 
-  await expectGotoOkay(page, "http://localhost:9080/alice");
+  await expectGotoOkay(page, 'http://localhost:9080/alice');
 
-  const respBob = await page.goto("http://localhost:9080/bob");
+  const respBob = await page.goto('http://localhost:9080/bob');
   expect(respBob?.status()).toBe(403);
-
 });
 
 //-----------------------------------------------------------------------------
 // Helper functions
 //-----------------------------------------------------------------------------
 
-async function login(page: Page, username: string, password: string, waitForUrl: string): Promise<Response> {
-  await page.locator("#username").fill(username);
-  await page.locator("#password").fill(password);
+async function login(
+  page: Page,
+  username: string,
+  password: string,
+  waitForUrl: string,
+): Promise<Response> {
+  await page.locator('#username').fill(username);
+  await page.locator('#password').fill(password);
 
   const responsePromise = page.waitForResponse(waitForUrl);
 
@@ -838,25 +865,28 @@ async function expectGotoOkay(page: Page, url: string) {
   expect(response?.status()).toBe(200);
 }
 
-async function loginAndGetToken(page: Page, username: string, password: string): Promise<string> {
-  const tokenResponse = await fetch("http://localhost:8000/realms/master/protocol/openid-connect/token", {
-    method: "POST",
-    headers:{
-      "Content-Type": "application/x-www-form-urlencoded"
-    },    
-    body: new URLSearchParams({
-        "grant_type": "password",
-        "username": username,
-        "password": password,
-        "client_id": "traefik",
-        "client_secret": "LQslcjK8ZeRrrhW7jKaFUUous9W5QvCr",
-        "scope": "openid profile email"
-    })
-  });
+async function loginAndGetToken(_page: Page, username: string, password: string): Promise<string> {
+  const tokenResponse = await fetch(
+    'http://localhost:8000/realms/master/protocol/openid-connect/token',
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        grant_type: 'password',
+        username: username,
+        password: password,
+        client_id: 'traefik',
+        client_secret: 'LQslcjK8ZeRrrhW7jKaFUUous9W5QvCr',
+        scope: 'openid profile email',
+      }),
+    },
+  );
 
   const tokens = await tokenResponse.json();
 
-  console.log("Using token:", tokens.id_token);
+  console.log('Using token:', tokens.id_token);
 
   return tokens.id_token;
 }

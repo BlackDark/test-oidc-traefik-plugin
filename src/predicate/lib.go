@@ -21,6 +21,7 @@ This file has been modified to remove the dependency on github.com/gravitational
 package predicate
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 	"strings"
@@ -33,7 +34,7 @@ import (
 func GetStringMapValue(mapVal, keyVal interface{}) (interface{}, error) {
 	key, ok := keyVal.(string)
 	if !ok {
-		return nil, fmt.Errorf("only string keys are supported")
+		return nil, errors.New("only string keys are supported")
 	}
 	switch m := mapVal.(type) {
 	case map[string][]string:
@@ -133,11 +134,11 @@ func Not(a BoolPredicate) BoolPredicate {
 // GetFieldByTag returns a field from the object based on the tag.
 func GetFieldByTag(ival interface{}, tagName string, fieldNames []string) (interface{}, error) {
 	if len(fieldNames) == 0 {
-		return nil, fmt.Errorf("missing field names")
+		return nil, errors.New("missing field names")
 	}
 
 	val := reflect.ValueOf(ival)
-	if val.Kind() == reflect.Interface || val.Kind() == reflect.Ptr {
+	if val.Kind() == reflect.Interface || val.Kind() == reflect.Pointer {
 		val = val.Elem()
 	}
 

@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -20,7 +21,7 @@ func TestExpandEnvironmentVariableStringFromEnv(t *testing.T) {
 func TestExpandEnvironmentVariableStringFromFile(t *testing.T) {
 	secretFile := filepath.Join(t.TempDir(), "secret")
 
-	if err := os.WriteFile(secretFile, []byte("value-from-file\n"), 0600); err != nil {
+	if err := os.WriteFile(secretFile, []byte("value-from-file\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -52,9 +53,11 @@ func TestChunkString(t *testing.T) {
 
 	value := ""
 
+	var valueSb55 strings.Builder
 	for i := 0; i < len(chunks); i++ {
-		value += chunks[i]
+		valueSb55.WriteString(chunks[i])
 	}
+	value += valueSb55.String()
 
 	if value != originalText {
 		t.Fail()
@@ -237,43 +240,43 @@ func TestParseAcceptHeader(t *testing.T) {
 }
 
 func TestIsHtmlRequest(t *testing.T) {
-	req, _ := http.NewRequest("GET", "/", nil)
+	req, _ := http.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("Accept", "text/html,application/xhtml+xml")
 	if !IsHtmlRequest(req) {
 		t.Fail()
 	}
 
-	req, _ = http.NewRequest("GET", "/", nil)
+	req, _ = http.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("Accept", "application/json")
 	if IsHtmlRequest(req) {
 		t.Fail()
 	}
 
-	req, _ = http.NewRequest("GET", "/", nil)
+	req, _ = http.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("Accept", "text/html, application/json")
 	if !IsHtmlRequest(req) {
 		t.Fail()
 	}
 
-	req, _ = http.NewRequest("GET", "/", nil)
+	req, _ = http.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("Accept", "application/json;q=0.9, text/html;q=0.8")
 	if IsHtmlRequest(req) {
 		t.Fail()
 	}
 
-	req, _ = http.NewRequest("GET", "/", nil)
+	req, _ = http.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("Accept", "application/json;q=0.8, text/html;q=0.9")
 	if !IsHtmlRequest(req) {
 		t.Fail()
 	}
 
-	req, _ = http.NewRequest("GET", "/", nil)
+	req, _ = http.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("Accept", "*/*")
 	if IsHtmlRequest(req) {
 		t.Fail()
 	}
 
-	req, _ = http.NewRequest("GET", "/", nil)
+	req, _ = http.NewRequest(http.MethodGet, "/", nil)
 	if IsHtmlRequest(req) {
 		t.Fail()
 	}

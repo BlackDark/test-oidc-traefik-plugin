@@ -1,18 +1,17 @@
-import * as fs from "fs";
-import * as path from "path";
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 
 export async function configureTraefik(yaml: string) {
-  const filePath = path.join(__dirname, ".http.yml");
+  const filePath = path.join(__dirname, '.http.yml');
 
-  let existing: string = "";
+  let existing: string = '';
 
-  if (fs.existsSync(filePath))
-    existing = fs.readFileSync(filePath).toString();
+  if (fs.existsSync(filePath)) existing = fs.readFileSync(filePath).toString();
 
   if (existing !== yaml) {
     fs.writeFileSync(filePath, yaml);
 
     // Wait some time for traefik to reload the config
-    await new Promise(r => setTimeout(r, 2000));
+    await new Promise((r) => setTimeout(r, 2000));
   }
 }

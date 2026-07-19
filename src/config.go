@@ -40,7 +40,7 @@ func CreateConfig() *config.Config {
 		},
 		// Note: It looks like we're not allowed to specify a default value for arrays here.
 		// Maybe a traefik bug. So I've moved this to the New() method.
-		//Scopes:                []string{"openid", "profile", "email"},
+		// Scopes:                []string{"openid", "profile", "email"},
 		CallbackUri:           "/oidc/callback",
 		LogoutUri:             "/logout",
 		FrontChannelLogoutUri: "/frontchannel-logout",
@@ -167,11 +167,11 @@ func New(uctx context.Context, next http.Handler, cfg *config.Config, name strin
 
 	if cfg.Provider.CABundle != "" && cfg.Provider.CABundleFile != "" {
 		logger.Log(logging.LevelError, "You can only use an inline CABundle OR CABundleFile, not both.")
-		return nil, errors.New("you can only use an inline CABundle OR CABundleFile, not both.")
+		return nil, errors.New("you can only use an inline CABundle OR CABundleFile, not both")
 	}
 
 	// Specify default scopes if not provided
-	if cfg.Scopes == nil || len(cfg.Scopes) == 0 {
+	if len(cfg.Scopes) == 0 {
 		cfg.Scopes = []string{"openid", "profile", "email"}
 	}
 
@@ -205,7 +205,6 @@ func New(uctx context.Context, next http.Handler, cfg *config.Config, name strin
 	var conditionalAuth *rules.RequestCondition
 	if cfg.BypassAuthenticationRule != "" {
 		ca, err := rules.ParseRequestCondition(cfg.BypassAuthenticationRule)
-
 		if err != nil {
 			return nil, err
 		}
@@ -247,7 +246,6 @@ func New(uctx context.Context, next http.Handler, cfg *config.Config, name strin
 		if ok := rootCAs.AppendCertsFromPEM(caBundleData); !ok {
 			logger.Log(logging.LevelWarn, "Failed to append CA bundle. Using system certificates only.")
 		}
-
 	}
 
 	for _, header := range cfg.Headers {

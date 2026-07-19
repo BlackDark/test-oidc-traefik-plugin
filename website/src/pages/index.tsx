@@ -2,14 +2,14 @@ import Link from '@docusaurus/Link';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 import Layout from '@theme/Layout';
 import {
-  ShieldCheck,
-  ListChecks,
-  KeyRound,
-  RefreshCw,
   ArrowUpFromLine,
-  GitBranchPlus,
   FileWarning,
+  GitBranchPlus,
   Globe,
+  KeyRound,
+  ListChecks,
+  RefreshCw,
+  ShieldCheck,
 } from 'lucide-react';
 
 import styles from './index.module.css';
@@ -83,14 +83,13 @@ const IDENTITY_PROVIDERS = [
   'ZITADEL',
 ];
 
-
 export default function Home(): JSX.Element {
   const { siteConfig } = useDocusaurusContext();
   return (
     <Layout
       title={siteConfig.title}
-      description="A Traefik middleware plugin that secures your services with OIDC (OpenID Connect) authentication and claim-based authorization.">
-
+      description="A Traefik middleware plugin that secures your services with OIDC (OpenID Connect) authentication and claim-based authorization."
+    >
       {/* ── Hero ─────────────────────────────────────────────── */}
       <section className={styles.hero}>
         <img className={styles.logo} alt="Traefik OIDC Auth logo" />
@@ -106,7 +105,8 @@ export default function Home(): JSX.Element {
           </Link>
           <Link
             className="button button--secondary button--lg"
-            href="https://github.com/sevensolutions/traefik-oidc-auth">
+            href="https://github.com/sevensolutions/traefik-oidc-auth"
+          >
             GitHub
           </Link>
         </div>
@@ -127,7 +127,7 @@ export default function Home(): JSX.Element {
           <div className={styles.featuresGrid}>
             {FEATURES.map(({ Icon, color, title, description }) => (
               <div key={title} className={styles.featureCard}>
-                <span className={styles.featureIconWrap} style={{ backgroundColor: color + '1f' }}>
+                <span className={styles.featureIconWrap} style={{ backgroundColor: `${color}1f` }}>
                   <Icon size={22} color={color} strokeWidth={1.75} />
                 </span>
                 <h3 className={styles.featureTitle}>{title}</h3>
@@ -147,7 +147,9 @@ export default function Home(): JSX.Element {
           </p>
           <div className={styles.providerList}>
             {IDENTITY_PROVIDERS.map((name) => (
-              <span key={name} className={styles.providerBadge}>{name}</span>
+              <span key={name} className={styles.providerBadge}>
+                {name}
+              </span>
             ))}
           </div>
           <Link className={styles.sectionLink} to="/docs/identity-providers">
@@ -162,7 +164,8 @@ export default function Home(): JSX.Element {
           <div className={styles.ctaBanner}>
             <h2 className={styles.ctaTitle}>Ready to get started?</h2>
             <p className={styles.ctaSubtitle}>
-              Follow the Getting Started guide to add OIDC authentication to any Traefik-proxied service in minutes.
+              Follow the Getting Started guide to add OIDC authentication to any Traefik-proxied
+              service in minutes.
             </p>
             <Link className="button button--primary button--lg" to="/docs/getting-started">
               Read the Getting Started Guide →
@@ -170,7 +173,6 @@ export default function Home(): JSX.Element {
           </div>
         </div>
       </section>
-
     </Layout>
   );
 }

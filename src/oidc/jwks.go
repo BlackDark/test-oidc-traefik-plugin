@@ -1,6 +1,7 @@
 package oidc
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rsa"
@@ -13,6 +14,7 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+
 	"github.com/BlackDark/test-oidc-traefik-plugin/src/logging"
 	"github.com/BlackDark/test-oidc-traefik-plugin/src/utils"
 )
@@ -86,8 +88,12 @@ func (h *JwksHandler) EnsureLoaded(logger *logging.Logger, httpClient *http.Clie
 }
 
 func (h *JwksHandler) loadKeys(httpClient *http.Client) error {
-	resp, err := httpClient.Get(h.Url)
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, h.Url, nil)
+	if err != nil {
+		return err
+	}
 
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return err
 	}
@@ -96,7 +102,6 @@ func (h *JwksHandler) loadKeys(httpClient *http.Client) error {
 
 	loaded := JwksKeys{}
 	err = json.NewDecoder(resp.Body).Decode(&loaded)
-
 	if err != nil {
 		return err
 	}
@@ -121,7 +126,6 @@ func (h *JwksHandler) Keyfunc(token *jwt.Token) (any, error) {
 		}
 
 		k, err := h.getRsaKey(kid)
-
 		if err != nil {
 			return nil, err
 		}
@@ -137,7 +141,6 @@ func (h *JwksHandler) Keyfunc(token *jwt.Token) (any, error) {
 		}
 
 		k, err := h.getEcdsaKey(kid)
-
 		if err != nil {
 			return nil, err
 		}
@@ -157,6 +160,7 @@ func (h *JwksHandler) getRsaKey(kid string) (*rsa.PublicKey, error) {
 
 	return nil, errors.New("unknown kid " + kid)
 }
+
 func (h *JwksHandler) getEcdsaKey(kid string) (*ecdsa.PublicKey, error) {
 	k := h.findEcdsaKey(kid)
 
@@ -176,6 +180,7 @@ func (h *JwksHandler) findRsaKey(kid string) *RsaKey {
 
 	return nil
 }
+
 func (h *JwksHandler) findEcdsaKey(kid string) *EcdsaKey {
 	for i := 0; i < len(h.EcdsaKeys); i++ {
 		if kid == h.EcdsaKeys[i].kid {
@@ -194,13 +199,14 @@ func extractKeys(keys *JwksKeys) ([]*RsaKey, []*EcdsaKey, error) {
 		k := keys.Keys[i]
 
 		if k.Use == "sig" || k.Use == "" {
-			if k.Kty == "RSA" {
+			switch k.Kty {
+			case "RSA":
 				extracted, err := extractRsaKey(&k)
 
 				if err == nil {
 					rsaKeys = append(rsaKeys, extracted)
 				}
-			} else if k.Kty == "EC" {
+			case "EC":
 				extracted, err := extractEcdsaKey(&k)
 
 				if err == nil {
@@ -216,15 +222,14 @@ func extractKeys(keys *JwksKeys) ([]*RsaKey, []*EcdsaKey, error) {
 
 	return rsaKeys, ecdsaKeys, nil
 }
+
 func extractRsaKey(key *JwksKey) (*RsaKey, error) {
 	decodedN, err := utils.ParseBigInt(key.N)
-
 	if err != nil {
 		return nil, err
 	}
 
 	decodedE, err := utils.ParseInt(key.E)
-
 	if err != nil {
 		return nil, err
 	}
@@ -233,18 +238,18 @@ func extractRsaKey(key *JwksKey) (*RsaKey, error) {
 		kid: key.Kid,
 		key: &rsa.PublicKey{
 			N: decodedN,
-			E: decodedE},
+			E: decodedE,
+		},
 	}, nil
 }
+
 func extractEcdsaKey(key *JwksKey) (*EcdsaKey, error) {
 	decodedX, err := utils.ParseBigInt(key.X)
-
 	if err != nil {
 		return nil, err
 	}
 
 	decodedY, err := utils.ParseBigInt(key.Y)
-
 	if err != nil {
 		return nil, err
 	}
@@ -254,7 +259,8 @@ func extractEcdsaKey(key *JwksKey) (*EcdsaKey, error) {
 		key: &ecdsa.PublicKey{
 			Curve: getEllipticCurve(key.Crv),
 			X:     decodedX,
-			Y:     decodedY},
+			Y:     decodedY,
+		},
 	}, nil
 }
 

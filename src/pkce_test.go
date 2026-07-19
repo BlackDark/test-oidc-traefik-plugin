@@ -65,7 +65,7 @@ func s256Challenge(verifier string) string {
 func TestRedirectToProvider_PkcePutsEncryptedVerifierInState(t *testing.T) {
 	toa := newPkceTestAuth(t)
 	rw := httptest.NewRecorder()
-	req := httptest.NewRequest("GET", "https://app.example.com/page", nil)
+	req := httptest.NewRequest(http.MethodGet, "https://app.example.com/page", nil)
 
 	toa.redirectToProvider(rw, req, "https://app.example.com/page", false)
 
@@ -110,7 +110,7 @@ func TestRedirectToProvider_ParallelFlowsHaveDistinctVerifiers(t *testing.T) {
 	verifiers := map[string]struct{}{}
 	for i := 0; i < 5; i++ {
 		rw := httptest.NewRecorder()
-		req := httptest.NewRequest("GET", "https://app.example.com/page", nil)
+		req := httptest.NewRequest(http.MethodGet, "https://app.example.com/page", nil)
 		toa.redirectToProvider(rw, req, "https://app.example.com/page", false)
 		st := decodeStateFromLocation(t, rw.Header().Get("Location"), toa.Config.Secret)
 		plain, err := utils.Decrypt(st.CodeVerifierEnc, toa.Config.Secret)
@@ -127,7 +127,7 @@ func TestRedirectToProvider_ParallelFlowsHaveDistinctVerifiers(t *testing.T) {
 func TestRedirectToProvider_ClearsLegacyCodeVerifierCookies(t *testing.T) {
 	toa := newPkceTestAuth(t)
 	rw := httptest.NewRecorder()
-	req := httptest.NewRequest("GET", "https://app.example.com/page", nil)
+	req := httptest.NewRequest(http.MethodGet, "https://app.example.com/page", nil)
 	req.AddCookie(&http.Cookie{Name: "TraefikOidcAuth.CodeVerifier", Value: "old"})
 	req.AddCookie(&http.Cookie{Name: "TraefikOidcAuth.CodeVerifier.abc", Value: "old2"})
 
@@ -148,7 +148,7 @@ func TestRedirectToProvider_NoLegacyClearWhenPkceDisabled(t *testing.T) {
 	toa := newPkceTestAuth(t)
 	toa.Config.Provider.UsePkceBool = false
 	rw := httptest.NewRecorder()
-	req := httptest.NewRequest("GET", "https://app.example.com/page", nil)
+	req := httptest.NewRequest(http.MethodGet, "https://app.example.com/page", nil)
 	req.AddCookie(&http.Cookie{Name: "TraefikOidcAuth.CodeVerifier", Value: "old"})
 
 	toa.redirectToProvider(rw, req, "https://app.example.com/page", false)
@@ -240,7 +240,7 @@ func TestHandleCallback_ClearsLegacyCookiesOnlyWhenPkceEnabled(t *testing.T) {
 			}
 
 			rw := httptest.NewRecorder()
-			req := httptest.NewRequest("GET", "https://app.example.com/oidc/callback?code=abc&state="+url.QueryEscape(stateB64), nil)
+			req := httptest.NewRequest(http.MethodGet, "https://app.example.com/oidc/callback?code=abc&state="+url.QueryEscape(stateB64), nil)
 			req.AddCookie(&http.Cookie{Name: "TraefikOidcAuth.CodeVerifier", Value: "legacy"})
 			req.AddCookie(&http.Cookie{Name: getLoginCsrfCookieName(toa.Config, state.Csrf), Value: state.Csrf})
 
@@ -267,7 +267,7 @@ func TestHandleCallback_ClearsLegacyCookiesOnlyWhenPkceEnabled(t *testing.T) {
 func TestRedirectToProvider_StateSizeReasonable(t *testing.T) {
 	toa := newPkceTestAuth(t)
 	rw := httptest.NewRecorder()
-	req := httptest.NewRequest("GET", "https://app.example.com/page", nil)
+	req := httptest.NewRequest(http.MethodGet, "https://app.example.com/page", nil)
 	longRedirect := "https://app.example.com/" + strings.Repeat("a", 2000)
 	toa.redirectToProvider(rw, req, longRedirect, false)
 
@@ -288,7 +288,7 @@ func TestExchangeAuthCode_UsesStateVerifier(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if err := r.ParseForm(); err != nil {
 			t.Errorf("ParseForm: %v", err)
-			http.Error(w, err.Error(), 500)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		posted <- r.Form.Get("code_verifier")
@@ -309,7 +309,7 @@ func TestExchangeAuthCode_UsesStateVerifier(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	req := httptest.NewRequest("GET", "https://app.example.com/oidc/callback", nil)
+	req := httptest.NewRequest(http.MethodGet, "https://app.example.com/oidc/callback", nil)
 	// Cookie present must be ignored — verifier comes from state.
 	req.AddCookie(&http.Cookie{Name: "TraefikOidcAuth.CodeVerifier", Value: "wrong"})
 
@@ -335,7 +335,7 @@ func TestExchangeAuthCode_MissingVerifierFailsBeforePost(t *testing.T) {
 	toa.httpClient = server.Client()
 	toa.DiscoveryDocument.TokenEndpoint = server.URL
 
-	req := httptest.NewRequest("GET", "https://app.example.com/oidc/callback", nil)
+	req := httptest.NewRequest(http.MethodGet, "https://app.example.com/oidc/callback", nil)
 	_, err := exchangeAuthCode(toa, req, "auth-code", "")
 	if err == nil {
 		t.Fatal("expected error")
@@ -357,7 +357,7 @@ func TestExchangeAuthCode_GarbageVerifierFailsBeforePost(t *testing.T) {
 	toa.httpClient = server.Client()
 	toa.DiscoveryDocument.TokenEndpoint = server.URL
 
-	req := httptest.NewRequest("GET", "https://app.example.com/oidc/callback", nil)
+	req := httptest.NewRequest(http.MethodGet, "https://app.example.com/oidc/callback", nil)
 	_, err := exchangeAuthCode(toa, req, "auth-code", "not-valid-ciphertext")
 	if err == nil {
 		t.Fatal("expected error")
@@ -370,7 +370,7 @@ func TestExchangeAuthCode_GarbageVerifierFailsBeforePost(t *testing.T) {
 func TestDoubleRedirect_DoesNotSetPkceCookieOrChallenge(t *testing.T) {
 	toa := newPkceTestAuth(t)
 	rw := httptest.NewRecorder()
-	req := httptest.NewRequest("GET", "https://app.example.com/page", nil)
+	req := httptest.NewRequest(http.MethodGet, "https://app.example.com/page", nil)
 
 	toa.doubleRedirectToProvider(rw, req, "https://app.example.com/page", false)
 
@@ -412,7 +412,7 @@ func TestDoubleRedirect_DoesNotSetPkceCookieOrChallenge(t *testing.T) {
 func TestRedirectToProvider_SetsNonce(t *testing.T) {
 	toa := newPkceTestAuth(t)
 	rw := httptest.NewRecorder()
-	req := httptest.NewRequest("GET", "https://app.example.com/page", nil)
+	req := httptest.NewRequest(http.MethodGet, "https://app.example.com/page", nil)
 	toa.redirectToProvider(rw, req, "https://app.example.com/page", false)
 
 	loc, err := url.Parse(rw.Header().Get("Location"))
@@ -440,7 +440,7 @@ func TestOidcNonceMatches(t *testing.T) {
 func TestRedirectToProvider_SetsLoginCsrfCookie(t *testing.T) {
 	toa := newPkceTestAuth(t)
 	rw := httptest.NewRecorder()
-	req := httptest.NewRequest("GET", "https://app.example.com/page", nil)
+	req := httptest.NewRequest(http.MethodGet, "https://app.example.com/page", nil)
 	toa.redirectToProvider(rw, req, "https://app.example.com/page", false)
 
 	st := decodeStateFromLocation(t, rw.Header().Get("Location"), toa.Config.Secret)
@@ -480,7 +480,7 @@ func TestHandleCallback_RejectsMissingCsrfCookie(t *testing.T) {
 		t.Fatal(err)
 	}
 	rw := httptest.NewRecorder()
-	req := httptest.NewRequest("GET", "https://app.example.com/oidc/callback?code=abc&state="+url.QueryEscape(stateB64), nil)
+	req := httptest.NewRequest(http.MethodGet, "https://app.example.com/oidc/callback?code=abc&state="+url.QueryEscape(stateB64), nil)
 	toa.handleCallback(rw, req)
 	if rw.Code != http.StatusForbidden {
 		t.Fatalf("status=%d want 403", rw.Code)

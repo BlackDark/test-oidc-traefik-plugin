@@ -1,6 +1,6 @@
-import {themes as prismThemes} from 'prism-react-renderer';
-import type {Config} from '@docusaurus/types';
 import type * as Preset from '@docusaurus/preset-classic';
+import type { Config } from '@docusaurus/types';
+import { themes as prismThemes } from 'prism-react-renderer';
 
 // This runs in Node.js - Don't use client-side code here (browser APIs, JSX...)
 
@@ -39,12 +39,11 @@ const config: Config = {
           sidebarPath: './sidebars.ts',
           // Please change this to your repo.
           // Remove this to remove the "edit this page" links.
-          editUrl:
-            'https://github.com/sevensolutions/traefik-oidc-auth/tree/main/website/',
+          editUrl: 'https://github.com/sevensolutions/traefik-oidc-auth/tree/main/website/',
         },
         theme: {
           customCss: './src/css/custom.css',
-        }
+        },
       } satisfies Preset.Options,
     ],
   ],
@@ -53,10 +52,10 @@ const config: Config = {
 
   markdown: {
     mermaid: true,
-    hooks: {
+    hooks: {
       onBrokenMarkdownImages: 'warn',
       onBrokenMarkdownLinks: 'warn',
-    }
+    },
   },
 
   themeConfig: {
@@ -90,7 +89,7 @@ const config: Config = {
         {
           href: 'https://github.com/sevensolutions/traefik-oidc-auth/discussions/categories/q-a',
           label: 'I have a Question',
-          position: 'right'
+          position: 'right',
         },
         {
           href: 'https://github.com/sevensolutions/traefik-oidc-auth',
@@ -101,8 +100,8 @@ const config: Config = {
     },
     docs: {
       sidebar: {
-        hideable: true
-      }
+        hideable: true,
+      },
     },
     footer: {
       style: 'dark',
@@ -129,8 +128,8 @@ const config: Config = {
           items: [
             {
               label: 'Github Discussions',
-              href: 'https://github.com/sevensolutions/traefik-oidc-auth/discussions'
-            }
+              href: 'https://github.com/sevensolutions/traefik-oidc-auth/discussions',
+            },
           ],
         },
         {
@@ -138,12 +137,12 @@ const config: Config = {
           items: [
             {
               label: 'GitHub',
-              href: 'https://github.com/sevensolutions/traefik-oidc-auth'
+              href: 'https://github.com/sevensolutions/traefik-oidc-auth',
             },
             {
-							label: 'Sponsor',
-							href: 'https://github.com/sponsors/sevensolutions'
-						}
+              label: 'Sponsor',
+              href: 'https://github.com/sponsors/sevensolutions',
+            },
           ],
         },
       ],

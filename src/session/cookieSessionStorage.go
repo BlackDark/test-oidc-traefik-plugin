@@ -8,8 +8,7 @@ import (
 	"github.com/BlackDark/test-oidc-traefik-plugin/src/utils"
 )
 
-type CookieSessionStorage struct {
-}
+type CookieSessionStorage struct{}
 
 func CreateCookieSessionStorage() *CookieSessionStorage {
 	storage := new(CookieSessionStorage)

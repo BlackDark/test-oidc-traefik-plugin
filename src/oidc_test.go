@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/golang-jwt/jwt/v5"
+
 	"github.com/BlackDark/test-oidc-traefik-plugin/src/config"
 	"github.com/BlackDark/test-oidc-traefik-plugin/src/logging"
 	"github.com/BlackDark/test-oidc-traefik-plugin/src/oidc"
@@ -55,7 +56,6 @@ func TestGetUserInfo_Success_JSON(t *testing.T) {
 
 	idTokenClaims := jwt.MapClaims{"sub": "12345"}
 	claims, err := toa.getUserInfo("some-access-token", idTokenClaims["sub"].(string))
-
 	if err != nil {
 		t.Fatalf("Expected no error, but got: %v", err)
 	}
@@ -98,7 +98,6 @@ func TestGetUserInfo_SubMismatch(t *testing.T) {
 
 	idTokenClaims := jwt.MapClaims{"sub": "12345"}
 	claims, err := toa.getUserInfo("some-access-token", idTokenClaims["sub"].(string))
-
 	if err != nil {
 		t.Fatalf("Expected no error, but got: %v", err)
 	}
@@ -163,7 +162,6 @@ func TestGetUserInfo_Success_JWT(t *testing.T) {
 
 	idTokenClaims := jwt.MapClaims{"sub": "12345"}
 	claims, err := toa.getUserInfo("some-access-token", idTokenClaims["sub"].(string))
-
 	if err != nil {
 		t.Fatalf("Expected no error, but got: %v", err)
 	}

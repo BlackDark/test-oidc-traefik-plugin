@@ -6,10 +6,10 @@
 /* ── Logo ─────────────────────────────────────────────────────── */
 .logo {
   width: 10em;
-  content: url('~/img/logo.svg');
+  content: url("~/img/logo.svg");
 }
-[data-theme='dark'] .logo {
-  content: url('~/img/logo-dark.svg');
+[data-theme="dark"] .logo {
+  content: url("~/img/logo-dark.svg");
 }
 
 /* ── Hero ─────────────────────────────────────────────────────── */
@@ -101,7 +101,9 @@
   border-radius: 12px;
   padding: 1.5rem 1.25rem;
   background: var(--ifm-card-background-color, var(--ifm-background-color));
-  transition: box-shadow 0.2s, transform 0.2s;
+  transition:
+    box-shadow 0.2s,
+    transform 0.2s;
 }
 .featureCard:hover {
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);

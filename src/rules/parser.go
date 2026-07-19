@@ -34,7 +34,6 @@ func NewParser(matchers []string) (predicate.Parser, error) {
 	for _, matcherName := range matchers {
 		// Fix for https://github.com/traefik/yaegi/discussions/1643
 		// We need to capture the variable manually.
-		matcherName := matcherName
 
 		fn := func(value ...string) TreeBuilder {
 			return func() *Tree {
@@ -132,7 +131,7 @@ func CheckRule(rule *Tree) error {
 }
 
 func lower(slice []string) []string {
-	var lowerStrings []string
+	lowerStrings := make([]string, 0, len(slice))
 	for _, value := range slice {
 		lowerStrings = append(lowerStrings, strings.ToLower(value))
 	}

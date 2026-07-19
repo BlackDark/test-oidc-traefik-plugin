@@ -12,7 +12,7 @@ type RequestCondition struct {
 }
 
 func ParseRequestCondition(rule string) (*RequestCondition, error) {
-	var matcherNames []string
+	matcherNames := make([]string, 0, len(httpFuncs))
 	for matcher := range httpFuncs {
 		matcherNames = append(matcherNames, matcher)
 	}

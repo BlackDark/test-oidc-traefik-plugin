@@ -50,3 +50,45 @@ tasks:
     dir: 'e2e'
     cmds:
       - npx playwright test
+
+  lint:
+    desc: 'Run all linters'
+    deps:
+      - lint:go
+      - lint:website
+      - lint:e2e
+  lint:go:
+    desc: 'Lint and check Go formatting'
+    cmds:
+      - golangci-lint run ./src/...
+  lint:website:
+    desc: 'Lint website with Biome'
+    dir: 'website'
+    cmds:
+      - bun run lint
+  lint:e2e:
+    desc: 'Lint e2e with Biome'
+    dir: 'e2e'
+    cmds:
+      - bun run lint
+
+  fmt:
+    desc: 'Format all code'
+    deps:
+      - fmt:go
+      - fmt:website
+      - fmt:e2e
+  fmt:go:
+    desc: 'Format Go code'
+    cmds:
+      - golangci-lint run --fix ./src/...
+  fmt:website:
+    desc: 'Format website with Biome'
+    dir: 'website'
+    cmds:
+      - bun run lint:fix
+  fmt:e2e:
+    desc: 'Format e2e with Biome'
+    dir: 'e2e'
+    cmds:
+      - bun run lint:fix

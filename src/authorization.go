@@ -6,13 +6,14 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/spyzhov/ajson"
+
 	"github.com/BlackDark/test-oidc-traefik-plugin/src/config"
 	"github.com/BlackDark/test-oidc-traefik-plugin/src/logging"
-	"github.com/spyzhov/ajson"
 )
 
 func isAuthorized(logger *logging.Logger, authorization *config.AuthorizationConfig, claims map[string]interface{}) bool {
-	if authorization.AssertClaims != nil && len(authorization.AssertClaims) > 0 {
+	if len(authorization.AssertClaims) > 0 {
 		parsed, err := json.Marshal(claims)
 		if err != nil {
 			logger.Log(logging.LevelWarn, "Error whilst marshalling claims object: %s", err.Error())
@@ -21,7 +22,7 @@ func isAuthorized(logger *logging.Logger, authorization *config.AuthorizationCon
 
 	assertions:
 		for _, assertion := range authorization.AssertClaims {
-			value, err := ajson.JSONPath(parsed, fmt.Sprintf("$.%s", assertion.Name))
+			value, err := ajson.JSONPath(parsed, "$."+assertion.Name)
 			if err != nil {
 				logger.Log(logging.LevelWarn, "Error whilst parsing path for claim %s in token claims: %s", assertion.Name, err.Error())
 				return false

@@ -1,7 +1,7 @@
 package rules
 
 import (
-	"fmt"
+	"errors"
 	"net/http"
 	"regexp"
 	"strings"
@@ -24,7 +24,7 @@ var httpFuncs = map[string]func(*requestConditionTree, ...string) error{
 
 func headerFunc(tree *requestConditionTree, values ...string) error {
 	if len(values) != 2 {
-		return fmt.Errorf("Header-rule requires exactly two arguments.")
+		return errors.New("header-rule requires exactly two arguments")
 	}
 
 	headerName := values[0]
@@ -45,7 +45,7 @@ func headerFunc(tree *requestConditionTree, values ...string) error {
 
 func headerRegexpFunc(tree *requestConditionTree, values ...string) error {
 	if len(values) != 2 {
-		return fmt.Errorf("HeaderRegexp-rule requires exactly two arguments.")
+		return errors.New("header regexp-rule requires exactly two arguments")
 	}
 
 	headerName := values[0]
@@ -71,7 +71,7 @@ func headerRegexpFunc(tree *requestConditionTree, values ...string) error {
 
 func pathFunc(tree *requestConditionTree, values ...string) error {
 	if len(values) != 1 {
-		return fmt.Errorf("Path-rule requires exactly one argument.")
+		return errors.New("path-rule requires exactly one argument")
 	}
 
 	expectedPath := values[0]
@@ -91,7 +91,7 @@ func pathFunc(tree *requestConditionTree, values ...string) error {
 
 func pathPrefixFunc(tree *requestConditionTree, values ...string) error {
 	if len(values) != 1 {
-		return fmt.Errorf("PathPrefix-rule requires exactly one argument.")
+		return errors.New("path prefix-rule requires exactly one argument")
 	}
 
 	pathPrefix := values[0]
@@ -111,7 +111,7 @@ func pathPrefixFunc(tree *requestConditionTree, values ...string) error {
 
 func pathRegexpFunc(tree *requestConditionTree, values ...string) error {
 	if len(values) != 1 {
-		return fmt.Errorf("PathRegexp-rule requires exactly one argument.")
+		return errors.New("path regexp-rule requires exactly one argument")
 	}
 
 	pathValueRegex := values[0]
@@ -136,7 +136,7 @@ func pathRegexpFunc(tree *requestConditionTree, values ...string) error {
 
 func methodFunc(tree *requestConditionTree, values ...string) error {
 	if len(values) != 1 {
-		return fmt.Errorf("Method-rule requires exactly one argument.")
+		return errors.New("method-rule requires exactly one argument")
 	}
 
 	expectedMethod := values[0]
@@ -156,7 +156,7 @@ func methodFunc(tree *requestConditionTree, values ...string) error {
 
 func queryFunc(tree *requestConditionTree, values ...string) error {
 	if len(values) != 2 {
-		return fmt.Errorf("Query-rule requires exactly two arguments.")
+		return errors.New("query-rule requires exactly two arguments")
 	}
 
 	parameterName := values[0]
@@ -177,7 +177,7 @@ func queryFunc(tree *requestConditionTree, values ...string) error {
 
 func queryRegexpFunc(tree *requestConditionTree, values ...string) error {
 	if len(values) != 2 {
-		return fmt.Errorf("QueryRegexp-rule requires exactly two arguments.")
+		return errors.New("query regexp-rule requires exactly two arguments")
 	}
 
 	parameterName := values[0]
@@ -203,7 +203,7 @@ func queryRegexpFunc(tree *requestConditionTree, values ...string) error {
 
 func hostFunc(tree *requestConditionTree, values ...string) error {
 	if len(values) != 1 {
-		return fmt.Errorf("Host-rule requires exactly one argument.")
+		return errors.New("host-rule requires exactly one argument")
 	}
 
 	expectedHost := values[0]
@@ -223,7 +223,7 @@ func hostFunc(tree *requestConditionTree, values ...string) error {
 
 func hostRegexpFunc(tree *requestConditionTree, values ...string) error {
 	if len(values) != 1 {
-		return fmt.Errorf("HostRegexp-rule requires exactly one argument.")
+		return errors.New("host regexp-rule requires exactly one argument")
 	}
 
 	hostValueRegex := values[0]
@@ -249,7 +249,7 @@ func hostRegexpFunc(tree *requestConditionTree, values ...string) error {
 func getMatchedText(matched bool) string {
 	if matched {
 		return "✅"
-	} else {
-		return "❌"
 	}
+
+	return "❌"
 }

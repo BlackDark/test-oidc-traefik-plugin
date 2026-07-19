@@ -72,7 +72,7 @@ func ExpandEnvironmentVariableBoolean(value string, defaultValue bool) (bool, er
 	} else if value == "false" || value == "0" {
 		return false, nil
 	} else if value != "" {
-		return false, errors.New(fmt.Sprintf("Invalid boolean value \"%s\". Boolean values must be true/false or 1/0.", value))
+		return false, fmt.Errorf("invalid boolean value \"%s\": boolean values must be true/false or 1/0", value)
 	}
 
 	return defaultValue, nil
@@ -135,20 +135,19 @@ func GetFullHost(req *http.Request) string {
 func EnsureAbsoluteUrl(req *http.Request, url string) string {
 	if strings.HasPrefix(url, "http://") || strings.HasPrefix(url, "https://") {
 		return url
-	} else {
-		host := GetFullHost(req)
-
-		if !strings.HasPrefix(url, "/") {
-			url = "/" + url
-		}
-
-		return host + url
 	}
+
+	host := GetFullHost(req)
+
+	if !strings.HasPrefix(url, "/") {
+		url = "/" + url
+	}
+
+	return host + url
 }
 
 func ParseBigInt(s string) (*big.Int, error) {
 	b, err := base64.RawURLEncoding.DecodeString(s)
-
 	if err != nil {
 		return nil, err
 	}
@@ -158,7 +157,6 @@ func ParseBigInt(s string) (*big.Int, error) {
 
 func ParseInt(s string) (int, error) {
 	v, err := ParseBigInt(s)
-
 	if err != nil {
 		return -1, err
 	}
@@ -247,7 +245,7 @@ func ValidateRedirectUri(redirectUri string, validUris []string) (string, error)
 		return "", nil
 	}
 
-	if validUris != nil && len(validUris) > 0 {
+	if len(validUris) > 0 {
 		for _, validUri := range validUris {
 			if matchUriTemplate(redirectUri, validUri) {
 				return redirectUri, nil
@@ -287,7 +285,6 @@ func matchUriTemplate(value string, template string) bool {
 func ParseAcceptType(raw string) AcceptType {
 	// Parse MIME type and parameters
 	mimeType, params, err := mime.ParseMediaType(raw)
-
 	if err != nil {
 		return AcceptType{}
 	}

@@ -28,21 +28,51 @@ func WriteError(logger *logging.Logger, page *ErrorPageConfig, rw http.ResponseW
 		if err != nil {
 			logger.Log(logging.LevelError, "Error while rendering unauthorized page: %s", err.Error())
 			http.Error(rw, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			return
+		}
+
+		statusCode, ok := data["statusCode"].(int)
+		if !ok {
+			http.Error(rw, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			return
 		}
 
 		rw.Header().Set("Content-Type", "text/html; charset=utf-8")
-		rw.WriteHeader(data["statusCode"].(int))
-		rw.Write([]byte(html))
+		rw.WriteHeader(statusCode)
+		if _, err := rw.Write([]byte(html)); err != nil {
+			logger.Log(logging.LevelError, "failed to write error page response: %s", err.Error())
+		}
+		return
+	}
+
+	statusType, ok := data["statusType"].(string)
+	if !ok {
+		http.Error(rw, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+	statusName, ok := data["statusName"].(string)
+	if !ok {
+		http.Error(rw, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+	description, ok := data["description"].(string)
+	if !ok {
+		http.Error(rw, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+	statusCode, ok := data["statusCode"].(int)
+	if !ok {
+		http.Error(rw, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 
 	problemDetails := ProblemDetails{
-		Type:   data["statusType"].(string),
-		Title:  data["statusName"].(string),
-		Detail: data["description"].(string),
+		Type:   statusType,
+		Title:  statusName,
+		Detail: description,
 	}
 
-	writeProblemDetail(logger, problemDetails, rw, data["statusCode"].(int))
+	writeProblemDetail(logger, problemDetails, rw, statusCode)
 }
 
 func writeProblemDetail(logger *logging.Logger, problem ProblemDetails, rw http.ResponseWriter, statusCode int) {
@@ -55,7 +85,9 @@ func writeProblemDetail(logger *logging.Logger, problem ProblemDetails, rw http.
 
 	rw.Header().Set("Content-Type", "application/json+problem")
 	rw.WriteHeader(statusCode)
-	rw.Write([]byte(json))
+	if _, err := rw.Write(json); err != nil {
+		logger.Log(logging.LevelError, "failed to write problem details response: %s", err.Error())
+	}
 }
 
 func renderPage(logger *logging.Logger, page *ErrorPageConfig, evalContext map[string]interface{}) (string, error) {

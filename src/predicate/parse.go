@@ -5,6 +5,7 @@ This file has been modified to remove the dependency on github.com/gravitational
 package predicate
 
 import (
+	"errors"
 	"fmt"
 	"go/ast"
 	"go/parser"
@@ -91,7 +92,7 @@ func (p *predicateParser) evaluateExpr(n ast.Expr) (interface{}, error) {
 
 	case *ast.IndexExpr:
 		if p.d.GetProperty == nil {
-			return nil, fmt.Errorf("properties are not supported")
+			return nil, errors.New("properties are not supported")
 		}
 
 		mapVal, err := p.evaluateExpr(l.X)
@@ -245,21 +246,21 @@ func literalToValue(a *ast.BasicLit) (interface{}, error) {
 	case token.FLOAT:
 		value, err := strconv.ParseFloat(a.Value, 64)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse argument: %s, error: %s", a.Value, err)
+			return nil, fmt.Errorf("failed to parse argument: %s, error: %w", a.Value, err)
 		}
 		return value, nil
 
 	case token.INT:
 		value, err := strconv.Atoi(a.Value)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse argument: %s, error: %s", a.Value, err)
+			return nil, fmt.Errorf("failed to parse argument: %s, error: %w", a.Value, err)
 		}
 		return value, nil
 
 	case token.STRING:
 		value, err := strconv.Unquote(a.Value)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse argument: %s, error: %s", a.Value, err)
+			return nil, fmt.Errorf("failed to parse argument: %s, error: %w", a.Value, err)
 		}
 		return value, nil
 	}

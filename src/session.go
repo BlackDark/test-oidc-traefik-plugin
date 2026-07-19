@@ -34,9 +34,8 @@ func (toa *TraefikOidcAuth) getSessionForRequest(req *http.Request) (*session.Se
 
 			if ok {
 				return session, false, claims, err
-			} else {
-				return nil, false, nil, fmt.Errorf("failed to validate token from AuthorizationHeader: %s", err.Error())
 			}
+			return nil, false, nil, fmt.Errorf("failed to validate token from AuthorizationHeader: %s", err.Error())
 		}
 	}
 
@@ -56,24 +55,21 @@ func (toa *TraefikOidcAuth) getSessionForRequest(req *http.Request) (*session.Se
 
 			if ok {
 				return session, false, claims, err
-			} else {
-				return nil, false, nil, fmt.Errorf("failed to validate token from AuthorizationCookie: %s", err.Error())
 			}
+			return nil, false, nil, fmt.Errorf("failed to validate token from AuthorizationCookie: %s", err.Error())
 		}
 	}
 
 	// Use SessionCookie, if present
 	sessionTicket, err := readChunkedCookie(req, getSessionCookieName(toa.Config))
-
 	if err != nil {
-		return nil, false, nil, fmt.Errorf("unable to read session cookie: %s", strings.TrimLeft(err.Error(), "http: "))
+		return nil, false, nil, fmt.Errorf("unable to read session cookie: %s", strings.TrimPrefix(err.Error(), "http: "))
 	}
 	if sessionTicket == "" {
-		return nil, false, nil, fmt.Errorf("no session cookie is present")
+		return nil, false, nil, errors.New("no session cookie is present")
 	}
 
 	session, claims, updatedSession, err := validateSessionTicket(toa, sessionTicket)
-
 	if err != nil {
 		return nil, false, claims, fmt.Errorf("failed to validate session ticket: %s", err.Error())
 	}
@@ -114,7 +110,6 @@ func validateSessionTicket(toa *TraefikOidcAuth, sessionTicket string) (*session
 			toa.logger.Log(logging.LevelInfo, "Trying to renew tokens...")
 
 			newTokens, err := toa.renewToken(session.RefreshToken)
-
 			if err != nil {
 				return nil, nil, nil, err
 			}
@@ -153,12 +148,11 @@ func validateSessionTicket(toa *TraefikOidcAuth, sessionTicket string) (*session
 			toa.logger.Log(logging.LevelInfo, "Successfully renewed session")
 
 			return session, claims, session, err
-		} else {
-			if err == nil {
-				err = errors.New("no refresh_token available")
-			}
-			return nil, nil, nil, err
 		}
+		if err == nil {
+			err = errors.New("no refresh_token available")
+		}
+		return nil, nil, nil, err
 	}
 
 	return session, claims, nil, nil
@@ -193,7 +187,7 @@ func (toa *TraefikOidcAuth) validateToken(session *session.SessionState) (bool, 
 		case "IdToken":
 			token = session.IdToken
 		default:
-			return false, nil, errors.New(fmt.Sprintf("Invalid value '%s' for TokenValidation", toa.Config.Provider.TokenValidation))
+			return false, nil, fmt.Errorf("invalid value '%s' for TokenValidation", toa.Config.Provider.TokenValidation)
 		}
 	}
 
@@ -210,7 +204,7 @@ func (toa *TraefikOidcAuth) validateToken(session *session.SessionState) (bool, 
 	if toa.Config.Provider.UseClaimsFromUserInfoBool {
 		subClaim, ok := claims["sub"].(string)
 		if !ok {
-			return false, nil, fmt.Errorf("failed to fetch UserInfo: 'sub' claim is not a string or missing")
+			return false, nil, errors.New("failed to fetch UserInfo: 'sub' claim is not a string or missing")
 		}
 
 		userInfoClaims, err := toa.getUserInfo(session.AccessToken, subClaim)
