@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/rand"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"strings"
 	"testing"
@@ -258,4 +259,36 @@ func TestClearLegacyCodeVerifierCookies_ExpiresHostnameAndHostOnly(t *testing.T)
 		t.Fatalf("missing domain variants hostname=%v hostOnly=%v headers=%v",
 			hasHostname, hasHostOnly, headers)
 	}
+}
+
+func TestValidateLoginCsrf(t *testing.T) {
+	cfg := &config.Config{CookieNamePrefix: "TraefikOidcAuth"}
+	csrf := "abc123csrfvalue"
+
+	t.Run("ok", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "https://app.example.com/oidc/callback", nil)
+		req.AddCookie(&http.Cookie{Name: getLoginCsrfCookieName(cfg, csrf), Value: csrf})
+		if err := validateLoginCsrf(cfg, req, csrf); err != nil {
+			t.Fatal(err)
+		}
+	})
+	t.Run("missing_cookie", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "https://app.example.com/oidc/callback", nil)
+		if err := validateLoginCsrf(cfg, req, csrf); err == nil {
+			t.Fatal("expected error")
+		}
+	})
+	t.Run("mismatch", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "https://app.example.com/oidc/callback", nil)
+		req.AddCookie(&http.Cookie{Name: getLoginCsrfCookieName(cfg, csrf), Value: "other"})
+		if err := validateLoginCsrf(cfg, req, csrf); err == nil {
+			t.Fatal("expected error")
+		}
+	})
+	t.Run("missing_state_csrf", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "https://app.example.com/oidc/callback", nil)
+		if err := validateLoginCsrf(cfg, req, ""); err == nil {
+			t.Fatal("expected error")
+		}
+	})
 }

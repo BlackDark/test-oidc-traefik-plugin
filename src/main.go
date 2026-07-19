@@ -347,6 +347,14 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 	redirectUrl := state.RedirectUrl
 
 	if state.Action == "Login" {
+		if err := validateLoginCsrf(toa.Config, req, state.Csrf); err != nil {
+			toa.logger.Log(logging.LevelWarn, "Login CSRF validation failed: %s", err.Error())
+			clearLoginCsrfCookie(toa.Config, rw, toa.CallbackURL, state.Csrf)
+			http.Error(rw, "Invalid login state", http.StatusForbidden)
+			return
+		}
+		clearLoginCsrfCookie(toa.Config, rw, toa.CallbackURL, state.Csrf)
+
 		authCode := req.URL.Query().Get("code")
 		if authCode == "" {
 			toa.logger.Log(logging.LevelWarn, "The identity provider didn't return a code.")
@@ -643,6 +651,14 @@ func (toa *TraefikOidcAuth) redirectToProvider(rw http.ResponseWriter, req *http
 		Action:      "Login",
 		RedirectUrl: redirectUrl,
 	}
+
+	csrf, err := randomBytesInHex(16)
+	if err != nil {
+		http.Error(rw, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	state.Csrf = csrf
+	setLoginCsrfCookie(toa.Config, rw, toa.CallbackURL, csrf)
 
 	toa.logger.Log(logging.LevelDebug, "AuthorizationEndPoint: %s", toa.DiscoveryDocument.AuthorizationEndpoint)
 

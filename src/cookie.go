@@ -1,6 +1,8 @@
 package src
 
 import (
+	"crypto/subtle"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -143,6 +145,10 @@ func getCodeVerifierCookieName(config *config.Config) string {
 	return makeCookieName(config, "CodeVerifier")
 }
 
+func getLoginCsrfCookieName(config *config.Config, csrf string) string {
+	return makeCookieName(config, "LoginCsrf."+csrf)
+}
+
 func getSessionCookieName(config *config.Config) string {
 	return makeCookieName(config, "Session")
 }
@@ -193,4 +199,52 @@ func clearLegacyCodeVerifierCookies(config *config.Config, rw http.ResponseWrite
 			expireVariants(c.Name)
 		}
 	}
+}
+
+const loginCsrfMaxAge = 600
+
+func setLoginCsrfCookie(config *config.Config, rw http.ResponseWriter, callbackURL *url.URL, csrf string) {
+	if callbackURL == nil || csrf == "" {
+		return
+	}
+	http.SetCookie(rw, &http.Cookie{
+		Name:     getLoginCsrfCookieName(config, csrf),
+		Value:    csrf,
+		MaxAge:   loginCsrfMaxAge,
+		Secure:   true,
+		HttpOnly: true,
+		Path:     callbackURL.Path,
+		Domain:   "", // host-only, same as session cookie default
+		SameSite: http.SameSiteLaxMode,
+	})
+}
+
+func clearLoginCsrfCookie(config *config.Config, rw http.ResponseWriter, callbackURL *url.URL, csrf string) {
+	if callbackURL == nil || csrf == "" {
+		return
+	}
+	http.SetCookie(rw, makeCookieExpireImmediately(&http.Cookie{
+		Name:     getLoginCsrfCookieName(config, csrf),
+		Value:    "",
+		Secure:   true,
+		HttpOnly: true,
+		Path:     callbackURL.Path,
+		Domain:   "",
+		SameSite: http.SameSiteLaxMode,
+	}))
+}
+
+// validateLoginCsrf checks the LoginCsrf cookie against sealed state. Returns nil on success.
+func validateLoginCsrf(config *config.Config, req *http.Request, csrf string) error {
+	if csrf == "" {
+		return errors.New("missing CSRF in state")
+	}
+	c, err := req.Cookie(getLoginCsrfCookieName(config, csrf))
+	if err != nil {
+		return errors.New("missing CSRF cookie")
+	}
+	if subtle.ConstantTimeCompare([]byte(c.Value), []byte(csrf)) != 1 {
+		return errors.New("CSRF cookie mismatch")
+	}
+	return nil
 }

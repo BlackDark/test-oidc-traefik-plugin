@@ -225,6 +225,7 @@ func TestHandleCallback_ClearsLegacyCookiesOnlyWhenPkceEnabled(t *testing.T) {
 			state := &oidc.OidcState{
 				Action:      "Login",
 				RedirectUrl: "https://app.example.com/",
+				Csrf:        "csrf-test-value-0123456789abcdef",
 			}
 			if tc.usePkce {
 				enc, err := utils.Encrypt("pkce-verifier-value-for-callback-test-01234567", toa.Config.Secret)
@@ -241,6 +242,7 @@ func TestHandleCallback_ClearsLegacyCookiesOnlyWhenPkceEnabled(t *testing.T) {
 			rw := httptest.NewRecorder()
 			req := httptest.NewRequest("GET", "https://app.example.com/oidc/callback?code=abc&state="+url.QueryEscape(stateB64), nil)
 			req.AddCookie(&http.Cookie{Name: "TraefikOidcAuth.CodeVerifier", Value: "legacy"})
+			req.AddCookie(&http.Cookie{Name: getLoginCsrfCookieName(toa.Config, state.Csrf), Value: state.Csrf})
 
 			toa.handleCallback(rw, req)
 
@@ -396,5 +398,63 @@ func TestDoubleRedirect_DoesNotSetPkceCookieOrChallenge(t *testing.T) {
 	}
 	if st.CodeVerifierEnc != "" {
 		t.Fatal("verifier must be created only on IdP redirect hop")
+	}
+	if st.Csrf != "" {
+		t.Fatal("csrf must be created only on IdP redirect hop")
+	}
+	for _, c := range rw.Result().Cookies() {
+		if strings.Contains(c.Name, "LoginCsrf") && c.MaxAge >= 0 && c.Value != "" {
+			t.Fatalf("double redirect must not set LoginCsrf cookie: %q", c.Name)
+		}
+	}
+}
+
+func TestRedirectToProvider_SetsLoginCsrfCookie(t *testing.T) {
+	toa := newPkceTestAuth(t)
+	rw := httptest.NewRecorder()
+	req := httptest.NewRequest("GET", "https://app.example.com/page", nil)
+	toa.redirectToProvider(rw, req, "https://app.example.com/page")
+
+	st := decodeStateFromLocation(t, rw.Header().Get("Location"), toa.Config.Secret)
+	if st.Csrf == "" {
+		t.Fatal("expected csrf in state")
+	}
+	found := false
+	for _, c := range rw.Result().Cookies() {
+		if c.Name == getLoginCsrfCookieName(toa.Config, st.Csrf) && c.Value == st.Csrf {
+			found = true
+			if c.SameSite != http.SameSiteLaxMode {
+				t.Fatalf("SameSite=%v", c.SameSite)
+			}
+		}
+	}
+	if !found {
+		t.Fatal("expected LoginCsrf cookie matching state")
+	}
+}
+
+func TestHandleCallback_RejectsMissingCsrfCookie(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/token", func(w http.ResponseWriter, r *http.Request) {
+		t.Error("token endpoint must not be called")
+	})
+	server := httptest.NewServer(mux)
+	defer server.Close()
+
+	toa := newCallbackTestAuth(t, false, server.URL+"/token", server.URL+"/introspect")
+	state := &oidc.OidcState{
+		Action:      "Login",
+		RedirectUrl: "https://app.example.com/",
+		Csrf:        "csrf-missing-cookie-test",
+	}
+	stateB64, err := oidc.SealState(state, toa.Config.Secret)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rw := httptest.NewRecorder()
+	req := httptest.NewRequest("GET", "https://app.example.com/oidc/callback?code=abc&state="+url.QueryEscape(stateB64), nil)
+	toa.handleCallback(rw, req)
+	if rw.Code != http.StatusForbidden {
+		t.Fatalf("status=%d want 403", rw.Code)
 	}
 }
