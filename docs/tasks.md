@@ -19,12 +19,12 @@ Living checklist. Each task: ADR (if design choice) → implement → tests → 
 |------|--------|
 | [#170](https://github.com/sevensolutions/traefik-oidc-auth/issues/170) / [PR #283](https://github.com/sevensolutions/traefik-oidc-auth/pull/283) | Done on base branch (PKCE in state). Keep. |
 | [#259](https://github.com/sevensolutions/traefik-oidc-auth/issues/259) VerifierCookie domain | Mostly obsolete after ADR 0001; legacy clear remains. |
-| [PR #282](https://github.com/sevensolutions/traefik-oidc-auth/pull/282) Unauth behavior split | Valuable UX/authz; **defer** (large, orthogonal). Track as follow-up. |
-| [PR #216](https://github.com/sevensolutions/traefik-oidc-auth/pull/216) Front-channel logout (draft) | **Defer** (draft, scope). |
-| [#236](https://github.com/sevensolutions/traefik-oidc-auth/issues/236) `nbf` / clock skew | **Do** small JWT leeway (Task 6). |
-| [#195](https://github.com/sevensolutions/traefik-oidc-auth/issues/195) `expires_in` validation mode | Useful scale/perf; **defer** unless time left. |
-| [#275](https://github.com/sevensolutions/traefik-oidc-auth/issues/275) camelCase keys | Traefik plugin catalog constraint; **skip** (not a real bug). |
-| [#87](https://github.com/sevensolutions/traefik-oidc-auth/issues/87) / [#262](https://github.com/sevensolutions/traefik-oidc-auth/issues/262) Redis / in-memory sessions | **Out of scope** for this branch (stateful). |
+| [PR #282](https://github.com/sevensolutions/traefik-oidc-auth/pull/282) Unauth behavior split | Valuable UX/authz; **deferred** (large, orthogonal). |
+| [PR #216](https://github.com/sevensolutions/traefik-oidc-auth/pull/216) Front-channel logout (draft) | **Deferred** (draft, scope). |
+| [#236](https://github.com/sevensolutions/traefik-oidc-auth/issues/236) `nbf` / clock skew | **Done** (Task 6, `TokenClockSkewSeconds` default 60). |
+| [#195](https://github.com/sevensolutions/traefik-oidc-auth/issues/195) `expires_in` validation mode | Deferred. |
+| [#275](https://github.com/sevensolutions/traefik-oidc-auth/issues/275) camelCase keys | Skipped (Traefik catalog constraint). |
+| [#87](https://github.com/sevensolutions/traefik-oidc-auth/issues/87) / [#262](https://github.com/sevensolutions/traefik-oidc-auth/issues/262) Redis / in-memory sessions | Out of scope. |
 
 ## Tasks
 
@@ -36,79 +36,38 @@ Living checklist. Each task: ADR (if design choice) → implement → tests → 
 
 ### Task 1 — Seal entire OIDC `state` (P0)
 
-**Why:** Only `cve` is encrypted today; `redirect_url` / `action` are forgeable base64 JSON → open redirect / flow tampering after callback.
-
-**Design:** ADR 0002 — encrypt+MAC whole state payload with `Secret` (reuse `utils.Encrypt` / `Decrypt`). Outer wire format stays opaque base64url string for the `state` query param.
-
-- [ ] ADR: `docs/adr/0002-sealed-oidc-state/README.md`
-- [ ] Impl: `SealState` / `UnsealState` (or evolve Encode/Decode)
-- [ ] Wire all Encode/Decode call sites through seal with `Config.Secret`
-- [ ] Tests: tampered ciphertext fails; round-trip; redirect_url cannot be forged without Secret
-- [ ] Review loop → commit: `feat(oidc): seal OIDC state with plugin secret`
-- **Done →** link ADR here: _(pending)_
+- [x] ADR: [`docs/adr/0002-sealed-oidc-state/README.md`](adr/0002-sealed-oidc-state/)
+- [x] Impl + tests + review approve
+- Commit: `feat(oidc): seal OIDC state with plugin secret`
 
 ### Task 2 — Login CSRF cookie binding (P0)
 
-**Why:** Encrypted state alone does not stop classic login CSRF (attacker starts flow, victim completes callback).
-
-**Design:** ADR 0003 — short-lived HttpOnly cookie (`CookieNamePrefix.LoginCsrf`) holding random value; same value inside sealed state; callback must match; clear cookie after use.
-
-- [ ] ADR: `docs/adr/0003-login-csrf-binding/README.md`
-- [ ] Impl + clear on success/failure paths as appropriate
-- [ ] Config: always on (no disable) unless strong reason; optional `LoginCsrfCookieMaxAge` default 600s
-- [ ] Tests: mismatch rejects; missing cookie rejects; happy path OK; parallel flows OK (unique csrf per flow)
-- [ ] Review loop → commit: `feat(oidc): bind login flow with CSRF cookie`
-- **Done →** link ADR here: _(pending)_
+- [x] ADR: [`docs/adr/0003-login-csrf-binding/README.md`](adr/0003-login-csrf-binding/)
+- [x] Per-flow `LoginCsrf.<csrf>` cookie + sealed `state.Csrf`
+- Commit: `feat(oidc): bind login flow with CSRF cookie`
 
 ### Task 3 — OIDC `nonce` for ID tokens (P1)
 
-**Why:** OIDC Core expects `nonce` to bind ID token to this authentication. Plugin validates IdToken by default but never sends/checks nonce.
-
-**Design:** ADR 0004 — generate nonce, put in authorize request + sealed state; when `TokenValidation=IdToken` (or always when id_token present), require claim match. Configurable: `Provider.ValidateNonce` default `true`.
-
-- [ ] ADR: `docs/adr/0004-oidc-nonce/README.md`
-- [ ] Impl + reserve `nonce` in `reservedAuthorizationParams`
-- [ ] Tests: missing/mismatch fail; match passes; AccessToken-only path does not require nonce claim when ValidateNonce off or no id_token validation
-- [ ] Review loop → commit: `feat(oidc): send and validate OIDC nonce`
-- **Done →** link ADR here: _(pending)_
+- [x] ADR: [`docs/adr/0004-oidc-nonce/README.md`](adr/0004-oidc-nonce/)
+- [x] Send `nonce`, store in sealed state, validate on IdToken when `ValidateNonce` (default true)
 
 ### Task 4 — Hard fail default Secret + safer defaults (P0/P1)
 
-**Why:** Default Secret decrypts sessions and sealed state. PKCE off by default fights RFC 9700. SessionCookie SameSite `default` is vague.
-
-- [ ] Refuse `Secret == DefaultSecret` in `New()` (keep `.traefik.yml` catalog hack if needed via provider URL sentinel)
-- [ ] Default `UsePkceBool: true` (document: set `false` only for broken IdPs)
-- [ ] Default `SessionCookie.SameSite: lax`
-- [ ] Short note in `website/docs/getting-started/middleware-configuration.md` (migration)
-- [ ] Tests for refuse-default-secret
-- [ ] Review loop → commit: `fix(security): refuse default secret and tighten defaults`
-- **Done →** note in this file when complete
+- [x] Refuse `Secret == DefaultSecret`
+- [x] Default `UsePkceBool: true`, `SessionCookie.SameSite: lax`, `ValidateNonceBool: true`
 
 ### Task 5 — Re-validate post-login redirect on callback (P1)
 
-**Why:** Login query path uses `ValidateRedirectUri`; callback trusts `state.RedirectUrl` after unseal. Defense in depth if allowlist configured (and safe default when empty).
-
-- [ ] Call `ValidateRedirectUri` on callback redirect before final redirect
-- [ ] Tests: allowlist reject still works post-callback
-- [ ] Review loop → commit: `fix(oidc): validate redirect URL on callback`
-- **Done →** note when complete
+- [x] When `ValidPostLoginRedirectUris` configured, validate `state.RedirectUrl` on callback
 
 ### Task 6 — JWT clock skew leeway (P1, issue #236)
 
-**Why:** `token is not valid yet` / clock drift between Traefik and IdP.
-
-- [ ] Add `Provider.TokenClockSkew` (duration string or seconds); default **60s**
-- [ ] Pass `jwt.WithLeeway` into local validation
-- [ ] Tests for near-future `nbf` within leeway
-- [ ] Review loop → commit: `fix(oidc): add JWT clock skew leeway`
-- **Done →** refs #236
+- [x] `Provider.TokenClockSkewSeconds` default 60 + `jwt.WithLeeway`
 
 ### Task 7 — Docs index + tasks closeout
 
-- [ ] Update `docs/adr/README.md` index for 0002–0004
-- [ ] Mark all tasks done in this file with links
-- [ ] Optional: smoke login on `informaten` (whoami + pocket-id) if local plugin mount feasible
-- [ ] Final review → commit: `docs: close OIDC hardening task list`
+- [x] Update `docs/adr/README.md` for 0002–0004
+- [x] Mark tasks done in this file
 
 ## Explicitly out of scope (this branch)
 
@@ -118,8 +77,19 @@ Living checklist. Each task: ADR (if design choice) → implement → tests → 
 - PAR, DPoP, JAR
 - camelCase Traefik CRD keys (#275)
 
+## Migration notes
+
+1. **Secret:** plugin refuses to start with the built-in default Secret. Set a random 32-char `Secret`.
+2. **PKCE:** defaults to on. Set `Provider.UsePkce: false` only if the IdP rejects PKCE.
+3. **SameSite:** session cookie default is `lax` (was `default`).
+4. **State format:** sealed (encrypted). In-flight logins during upgrade fail once; users re-login.
+5. **Nonce:** IdP must return `nonce` in ID token when `TokenValidation=IdToken` (disable with `ValidateNonce: false` if needed).
+
 ## Progress log
 
 | Date | Commit | Notes |
 |------|--------|-------|
-| 2026-07-19 | _(pending)_ | Plan created |
+| 2026-07-19 | `c419300` | Plan created |
+| 2026-07-19 | `4068baa` | ADR 0002 sealed state |
+| 2026-07-19 | `43ae810` | ADR 0003 login CSRF |
+| 2026-07-19 | _(pending)_ | Tasks 3–7 |

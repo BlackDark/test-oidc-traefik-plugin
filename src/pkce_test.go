@@ -409,6 +409,34 @@ func TestDoubleRedirect_DoesNotSetPkceCookieOrChallenge(t *testing.T) {
 	}
 }
 
+func TestRedirectToProvider_SetsNonce(t *testing.T) {
+	toa := newPkceTestAuth(t)
+	rw := httptest.NewRecorder()
+	req := httptest.NewRequest("GET", "https://app.example.com/page", nil)
+	toa.redirectToProvider(rw, req, "https://app.example.com/page")
+
+	loc, err := url.Parse(rw.Header().Get("Location"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	st := decodeStateFromLocation(t, loc.String(), toa.Config.Secret)
+	if st.Nonce == "" {
+		t.Fatal("expected nonce in state")
+	}
+	if loc.Query().Get("nonce") != st.Nonce {
+		t.Fatalf("authorize nonce=%q state=%q", loc.Query().Get("nonce"), st.Nonce)
+	}
+}
+
+func TestOidcNonceMatches(t *testing.T) {
+	if !oidcNonceMatches("abc", "abc") {
+		t.Fatal("expected match")
+	}
+	if oidcNonceMatches("abc", "xyz") {
+		t.Fatal("expected mismatch")
+	}
+}
+
 func TestRedirectToProvider_SetsLoginCsrfCookie(t *testing.T) {
 	toa := newPkceTestAuth(t)
 	rw := httptest.NewRecorder()

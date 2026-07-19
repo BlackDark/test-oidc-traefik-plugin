@@ -201,7 +201,7 @@ func (toa *TraefikOidcAuth) validateToken(session *session.SessionState) (bool, 
 		return toa.introspectToken(token)
 	}
 
-	ok, claims, err := toa.validateTokenLocally(token)
+	ok, claims, err := toa.validateTokenLocally(token, "")
 
 	if !ok {
 		return ok, claims, err

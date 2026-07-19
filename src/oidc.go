@@ -2,6 +2,7 @@ package src
 
 import (
 	"crypto/rand"
+	"crypto/subtle"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -133,7 +134,7 @@ func exchangeAuthCode(oidcAuth *TraefikOidcAuth, req *http.Request, authCode str
 	return tokenResponse, nil
 }
 
-func (toa *TraefikOidcAuth) validateTokenLocally(tokenString string) (bool, map[string]interface{}, error) {
+func (toa *TraefikOidcAuth) validateTokenLocally(tokenString string, expectedNonce string) (bool, map[string]interface{}, error) {
 	claims := jwt.MapClaims{}
 
 	err := toa.Jwks.EnsureLoaded(toa.logger, toa.httpClient, false)
@@ -141,8 +142,11 @@ func (toa *TraefikOidcAuth) validateTokenLocally(tokenString string) (bool, map[
 		return false, nil, err
 	}
 
+	leeway := time.Duration(toa.Config.Provider.TokenClockSkewSeconds) * time.Second
+
 	options := []jwt.ParserOption{
 		jwt.WithExpirationRequired(),
+		jwt.WithLeeway(leeway),
 	}
 
 	if toa.Config.Provider.ValidateIssuerBool {
@@ -182,7 +186,18 @@ func (toa *TraefikOidcAuth) validateTokenLocally(tokenString string) (bool, map[
 		}
 	}
 
+	if expectedNonce != "" && toa.Config.Provider.ValidateNonceBool {
+		claimNonce, _ := claims["nonce"].(string)
+		if !oidcNonceMatches(claimNonce, expectedNonce) {
+			return false, nil, errors.New("oidc nonce mismatch")
+		}
+	}
+
 	return true, claims, nil
+}
+
+func oidcNonceMatches(claimNonce, expected string) bool {
+	return subtle.ConstantTimeCompare([]byte(claimNonce), []byte(expected)) == 1
 }
 
 // isTokenExpiredError checks whether the error indicates the JWT token is expired.

@@ -392,7 +392,7 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 		if toa.Config.Provider.TokenValidation == "Introspection" {
 			_, claims, err = toa.introspectToken(usedToken)
 		} else {
-			_, claims, err = toa.validateTokenLocally(usedToken)
+			_, claims, err = toa.validateTokenLocally(usedToken, state.Nonce)
 		}
 
 		if err != nil {
@@ -441,6 +441,16 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 
 		if redirectUrl != "" {
 			redirectUrl = utils.EnsureAbsoluteUrl(req, redirectUrl)
+			// Only enforce allowlist when configured (same as /login?redirect_uri=...).
+			if len(toa.Config.ValidPostLoginRedirectUris) > 0 {
+				validated, err := utils.ValidateRedirectUri(redirectUrl, toa.Config.ValidPostLoginRedirectUris)
+				if err != nil {
+					toa.logger.Log(logging.LevelWarn, "Post-login redirect rejected: %s", err.Error())
+					http.Error(rw, "Invalid redirect", http.StatusBadRequest)
+					return
+				}
+				redirectUrl = validated
+			}
 		} else {
 			redirectUrl = utils.EnsureAbsoluteUrl(req, toa.Config.PostLoginRedirectUri)
 		}
@@ -640,6 +650,7 @@ var reservedAuthorizationParams = map[string]bool{
 	"resource":              true,
 	"code_challenge":        true,
 	"code_challenge_method": true,
+	"nonce":                 true,
 }
 
 func (toa *TraefikOidcAuth) redirectToProvider(rw http.ResponseWriter, req *http.Request, redirectUrl string) {
@@ -659,6 +670,13 @@ func (toa *TraefikOidcAuth) redirectToProvider(rw http.ResponseWriter, req *http
 	}
 	state.Csrf = csrf
 	setLoginCsrfCookie(toa.Config, rw, toa.CallbackURL, csrf)
+
+	nonce, err := randomBytesInHex(16)
+	if err != nil {
+		http.Error(rw, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	state.Nonce = nonce
 
 	toa.logger.Log(logging.LevelDebug, "AuthorizationEndPoint: %s", toa.DiscoveryDocument.AuthorizationEndpoint)
 
@@ -692,6 +710,8 @@ func (toa *TraefikOidcAuth) redirectToProvider(rw http.ResponseWriter, req *http
 	if prompt := req.URL.Query().Get("prompt"); prompt != "" {
 		urlValues.Set("prompt", prompt)
 	}
+
+	urlValues.Set("nonce", state.Nonce)
 
 	if toa.Config.Provider.UsePkceBool {
 		codeVerifier, err := randomBytesInHex(32)

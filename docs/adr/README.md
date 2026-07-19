@@ -38,3 +38,5 @@ Good, bad, and follow-ups.
 |-----|-------|--------|
 | [0001](0001-pkce-verifier-in-oidc-state/) | PKCE code_verifier in OIDC state | Accepted |
 | [0002](0002-sealed-oidc-state/) | Seal entire OIDC state | Accepted |
+| [0003](0003-login-csrf-binding/) | Login CSRF cookie binding | Accepted |
+| [0004](0004-oidc-nonce/) | OIDC nonce for ID tokens | Accepted |

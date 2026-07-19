@@ -28,13 +28,15 @@ func CreateConfig() *config.Config {
 		LogLevel: logging.LevelWarn,
 		Secret:   config.DefaultSecret,
 		Provider: &config.ProviderConfig{
-			UsePkceBool:               false,
+			UsePkceBool:               true,
 			InsecureSkipVerifyBool:    false,
 			ValidateIssuerBool:        true,
 			ValidateAudienceBool:      true,
+			ValidateNonceBool:         true,
 			TokenValidation:           "IdToken",
 			TokenRenewalThreshold:     0.75,
 			UseClaimsFromUserInfoBool: false,
+			TokenClockSkewSeconds:     60,
 		},
 		// Note: It looks like we're not allowed to specify a default value for arrays here.
 		// Maybe a traefik bug. So I've moved this to the New() method.
@@ -48,7 +50,7 @@ func CreateConfig() *config.Config {
 			Domain:   "",
 			Secure:   true,
 			HttpOnly: true,
-			SameSite: "default",
+			SameSite: "lax",
 			MaxAge:   0,
 		},
 		AuthorizationHeader:  &config.AuthorizationHeaderConfig{},
@@ -117,6 +119,13 @@ func New(uctx context.Context, next http.Handler, cfg *config.Config, name strin
 		return nil, err
 	}
 	cfg.Provider.ValidAudience = utils.ExpandEnvironmentVariableString(cfg.Provider.ValidAudience)
+	cfg.Provider.ValidateNonceBool, err = utils.ExpandEnvironmentVariableBoolean(cfg.Provider.ValidateNonce, cfg.Provider.ValidateNonceBool)
+	if err != nil {
+		return nil, err
+	}
+	if cfg.Provider.TokenClockSkewSeconds < 0 {
+		cfg.Provider.TokenClockSkewSeconds = 60
+	}
 	cfg.Provider.InsecureSkipVerifyBool, err = utils.ExpandEnvironmentVariableBoolean(cfg.Provider.InsecureSkipVerify, cfg.Provider.InsecureSkipVerifyBool)
 	if err != nil {
 		return nil, err
@@ -140,7 +149,8 @@ func New(uctx context.Context, next http.Handler, cfg *config.Config, name strin
 	cfg.ErrorPages.Unauthorized.RedirectTo = utils.ExpandEnvironmentVariableString(cfg.ErrorPages.Unauthorized.RedirectTo)
 
 	if cfg.Secret == config.DefaultSecret {
-		logger.Log(logging.LevelWarn, "You're using the default secret! It is highly recommended to change the secret by specifying a random 32 character value using the Secret-option.")
+		logger.Log(logging.LevelError, "Refusing to start with the default Secret. Set Provider Secret to a random 32 character value.")
+		return nil, errors.New("default secret is not allowed")
 	}
 
 	secret := []byte(cfg.Secret)

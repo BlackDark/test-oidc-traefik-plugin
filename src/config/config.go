@@ -92,6 +92,14 @@ type ProviderConfig struct {
 
 	UseClaimsFromUserInfo     string `json:"use_claims_from_user_info"`
 	UseClaimsFromUserInfoBool bool   `json:"use_claims_from_user_info_bool"`
+
+	// ValidateNonce requires the ID token nonce claim to match the sealed login state (OIDC Core).
+	// Default true when unset via CreateConfig. Set false only if the IdP cannot return nonce.
+	ValidateNonce     string `json:"validate_nonce"`
+	ValidateNonceBool bool   `json:"validate_nonce_bool"`
+
+	// TokenClockSkewSeconds is leeway for JWT nbf/exp validation (issue #236). Default 60.
+	TokenClockSkewSeconds int `json:"token_clock_skew_seconds"`
 }
 
 type SessionCookieConfig struct {
