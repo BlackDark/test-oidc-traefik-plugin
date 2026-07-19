@@ -11,8 +11,8 @@
   "license": "ISC",
   "description": "",
   "devDependencies": {
-    "@playwright/test": "^1.59.1",
-    "@types/node": "^22.19.17",
+    "@playwright/test": "^1.61.1",
+    "@types/node": "^22.20.1",
     "docker-compose": "^1.4.2"
   }
 }
