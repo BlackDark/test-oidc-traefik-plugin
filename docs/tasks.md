@@ -92,4 +92,4 @@ Living checklist. Each task: ADR (if design choice) → implement → tests → 
 | 2026-07-19 | `c419300` | Plan created |
 | 2026-07-19 | `4068baa` | ADR 0002 sealed state |
 | 2026-07-19 | `43ae810` | ADR 0003 login CSRF |
-| 2026-07-19 | _(pending)_ | Tasks 3–7 |
+| 2026-07-19 | `4feab63` | Tasks 3–7 (nonce, defaults, redirect, leeway) |
