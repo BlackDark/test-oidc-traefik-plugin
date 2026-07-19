@@ -78,7 +78,7 @@ func WriteError(logger *logging.Logger, page *ErrorPageConfig, rw http.ResponseW
 func writeProblemDetail(logger *logging.Logger, problem ProblemDetails, rw http.ResponseWriter, statusCode int) {
 	json, err := json.Marshal(problem)
 	if err != nil {
-		logger.Log(logging.LevelError, err.Error())
+		logger.Log(logging.LevelError, "%s", err.Error())
 		http.Error(rw, err.Error(), http.StatusInternalServerError)
 		return
 	}
