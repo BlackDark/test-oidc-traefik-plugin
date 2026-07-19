@@ -6,11 +6,11 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/sevensolutions/traefik-oidc-auth/src/config"
-	"github.com/sevensolutions/traefik-oidc-auth/src/errorPages"
-	"github.com/sevensolutions/traefik-oidc-auth/src/logging"
-	"github.com/sevensolutions/traefik-oidc-auth/src/oidc"
-	"github.com/sevensolutions/traefik-oidc-auth/src/session"
+	"github.com/BlackDark/test-oidc-traefik-plugin/src/config"
+	"github.com/BlackDark/test-oidc-traefik-plugin/src/errorPages"
+	"github.com/BlackDark/test-oidc-traefik-plugin/src/logging"
+	"github.com/BlackDark/test-oidc-traefik-plugin/src/oidc"
+	"github.com/BlackDark/test-oidc-traefik-plugin/src/session"
 )
 
 func newAuthBehaviorTestAuth(t *testing.T) *TraefikOidcAuth {

@@ -3,7 +3,7 @@ package config
 import (
 	"text/template"
 
-	"github.com/sevensolutions/traefik-oidc-auth/src/errorPages"
+	"github.com/BlackDark/test-oidc-traefik-plugin/src/errorPages"
 )
 
 const DefaultSecret = "MLFs4TT99kOOq8h3UAVRtYoCTDYXiRcZ"

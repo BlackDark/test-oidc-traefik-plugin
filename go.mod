@@ -1,4 +1,4 @@
-module github.com/sevensolutions/traefik-oidc-auth
+module github.com/BlackDark/test-oidc-traefik-plugin
 
 go 1.23.2
 

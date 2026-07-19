@@ -4,8 +4,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/sevensolutions/traefik-oidc-auth/src/config"
-	"github.com/sevensolutions/traefik-oidc-auth/src/logging"
+	"github.com/BlackDark/test-oidc-traefik-plugin/src/config"
+	"github.com/BlackDark/test-oidc-traefik-plugin/src/logging"
 )
 
 type SessionStorage interface {

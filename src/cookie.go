@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sevensolutions/traefik-oidc-auth/src/config"
-	"github.com/sevensolutions/traefik-oidc-auth/src/utils"
+	"github.com/BlackDark/test-oidc-traefik-plugin/src/config"
+	"github.com/BlackDark/test-oidc-traefik-plugin/src/utils"
 )
 
 func setChunkedCookies(config *config.Config, rw http.ResponseWriter, cookieName string, cookieValue string) {

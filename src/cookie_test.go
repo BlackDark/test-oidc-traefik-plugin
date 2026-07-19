@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/sevensolutions/traefik-oidc-auth/src/config"
+	"github.com/BlackDark/test-oidc-traefik-plugin/src/config"
 )
 
 func TestSetChunkedCookiesNonChunked(t *testing.T) {

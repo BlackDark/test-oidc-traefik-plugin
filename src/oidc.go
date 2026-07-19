@@ -15,9 +15,9 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/sevensolutions/traefik-oidc-auth/src/logging"
-	"github.com/sevensolutions/traefik-oidc-auth/src/oidc"
-	"github.com/sevensolutions/traefik-oidc-auth/src/utils"
+	"github.com/BlackDark/test-oidc-traefik-plugin/src/logging"
+	"github.com/BlackDark/test-oidc-traefik-plugin/src/oidc"
+	"github.com/BlackDark/test-oidc-traefik-plugin/src/utils"
 )
 
 func GetOidcDiscovery(logger *logging.Logger, httpClient *http.Client, providerUrl *url.URL) (*oidc.OidcDiscovery, error) {

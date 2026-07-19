@@ -8,9 +8,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sevensolutions/traefik-oidc-auth/src/config"
-	"github.com/sevensolutions/traefik-oidc-auth/src/logging"
-	"github.com/sevensolutions/traefik-oidc-auth/src/session"
+	"github.com/BlackDark/test-oidc-traefik-plugin/src/config"
+	"github.com/BlackDark/test-oidc-traefik-plugin/src/logging"
+	"github.com/BlackDark/test-oidc-traefik-plugin/src/session"
 )
 
 func (toa *TraefikOidcAuth) getSessionForRequest(req *http.Request) (*session.SessionState, bool, map[string]interface{}, error) {

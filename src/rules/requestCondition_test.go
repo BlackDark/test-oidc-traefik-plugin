@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/sevensolutions/traefik-oidc-auth/src/logging"
+	"github.com/BlackDark/test-oidc-traefik-plugin/src/logging"
 )
 
 func TestRequestConditionHeader(t *testing.T) {

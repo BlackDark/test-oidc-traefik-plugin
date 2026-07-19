@@ -12,9 +12,9 @@ import (
 	"testing"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/sevensolutions/traefik-oidc-auth/src/config"
-	"github.com/sevensolutions/traefik-oidc-auth/src/logging"
-	"github.com/sevensolutions/traefik-oidc-auth/src/oidc"
+	"github.com/BlackDark/test-oidc-traefik-plugin/src/config"
+	"github.com/BlackDark/test-oidc-traefik-plugin/src/logging"
+	"github.com/BlackDark/test-oidc-traefik-plugin/src/oidc"
 )
 
 func newGetUserInfoTest(t *testing.T, handler http.HandlerFunc) (*TraefikOidcAuth, *httptest.Server) {

@@ -17,14 +17,14 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/sevensolutions/traefik-oidc-auth/src/config"
-	"github.com/sevensolutions/traefik-oidc-auth/src/errorPages"
-	"github.com/sevensolutions/traefik-oidc-auth/src/rules"
+	"github.com/BlackDark/test-oidc-traefik-plugin/src/config"
+	"github.com/BlackDark/test-oidc-traefik-plugin/src/errorPages"
+	"github.com/BlackDark/test-oidc-traefik-plugin/src/rules"
 
-	"github.com/sevensolutions/traefik-oidc-auth/src/logging"
-	"github.com/sevensolutions/traefik-oidc-auth/src/oidc"
-	"github.com/sevensolutions/traefik-oidc-auth/src/session"
-	"github.com/sevensolutions/traefik-oidc-auth/src/utils"
+	"github.com/BlackDark/test-oidc-traefik-plugin/src/logging"
+	"github.com/BlackDark/test-oidc-traefik-plugin/src/oidc"
+	"github.com/BlackDark/test-oidc-traefik-plugin/src/session"
+	"github.com/BlackDark/test-oidc-traefik-plugin/src/utils"
 )
 
 type TraefikOidcAuth struct {

@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/sevensolutions/traefik-oidc-auth/src/predicate"
+	"github.com/BlackDark/test-oidc-traefik-plugin/src/predicate"
 )
 
 const (
