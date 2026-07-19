@@ -3,39 +3,53 @@ package oidc
 import (
 	"encoding/base64"
 	"encoding/json"
+
+	"github.com/sevensolutions/traefik-oidc-auth/src/utils"
 )
 
 type OidcState struct {
 	Action      string `json:"action"`
 	RedirectUrl string `json:"redirect_url"`
 	// CodeVerifierEnc is the AES-GCM encrypted PKCE code_verifier (utils.Encrypt output).
-	// Nested inside JSON then RawURL-encoded by EncodeState — do not put Encrypt output bare in a query string.
+	// Nested inside JSON then sealed by SealState — do not put Encrypt output bare in a query string.
 	// Carried in state so parallel login redirects cannot overwrite each other via a shared cookie.
 	CodeVerifierEnc string `json:"cve,omitempty"`
+	// Csrf binds this authorize flow to a LoginCsrf cookie (ADR 0003).
+	Csrf string `json:"csrf,omitempty"`
+	// Nonce is the OIDC nonce for ID token binding (ADR 0004).
+	Nonce string `json:"nonce,omitempty"`
 }
 
-func EncodeState(state *OidcState) (string, error) {
+// SealState encrypts the full OidcState with Secret and returns a RawURL-safe opaque state string (ADR 0002).
+func SealState(state *OidcState, secret string) (string, error) {
 	stateBytes, err := json.Marshal(state)
-
 	if err != nil {
 		return "", err
 	}
 
-	stateBase64 := base64.RawURLEncoding.EncodeToString(stateBytes)
-	return stateBase64, nil
+	encrypted, err := utils.Encrypt(string(stateBytes), secret)
+	if err != nil {
+		return "", err
+	}
+
+	return base64.RawURLEncoding.EncodeToString([]byte(encrypted)), nil
 }
 
-func DecodeState(base64State string) (*OidcState, error) {
-	stateBytes, err := base64.RawURLEncoding.DecodeString(base64State)
+// UnsealState decrypts an opaque state string produced by SealState.
+func UnsealState(sealed string, secret string) (*OidcState, error) {
+	encBytes, err := base64.RawURLEncoding.DecodeString(sealed)
+	if err != nil {
+		return nil, err
+	}
 
+	plain, err := utils.Decrypt(string(encBytes), secret)
 	if err != nil {
 		return nil, err
 	}
 
 	var state OidcState
-	err2 := json.Unmarshal(stateBytes, &state)
-	if err2 != nil {
-		return nil, err2
+	if err := json.Unmarshal([]byte(plain), &state); err != nil {
+		return nil, err
 	}
 
 	return &state, nil

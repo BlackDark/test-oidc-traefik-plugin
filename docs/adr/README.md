@@ -37,3 +37,4 @@ Good, bad, and follow-ups.
 | ADR | Title | Status |
 |-----|-------|--------|
 | [0001](0001-pkce-verifier-in-oidc-state/) | PKCE code_verifier in OIDC state | Accepted |
+| [0002](0002-sealed-oidc-state/) | Seal entire OIDC state | Accepted |

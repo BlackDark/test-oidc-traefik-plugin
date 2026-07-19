@@ -337,7 +337,7 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 		return
 	}
 
-	state, err := oidc.DecodeState(base64State)
+	state, err := oidc.UnsealState(base64State, toa.Config.Secret)
 	if err != nil {
 		toa.logger.Log(logging.LevelWarn, "State on callback request is invalid.")
 		http.Error(rw, "State is invalid", http.StatusInternalServerError)
@@ -495,7 +495,7 @@ func (toa *TraefikOidcAuth) handleLogout(rw http.ResponseWriter, req *http.Reque
 		RedirectUrl: redirectUri,
 	}
 
-	base64State, err := oidc.EncodeState(state)
+	base64State, err := oidc.SealState(state, toa.Config.Secret)
 	if err != nil {
 		toa.logger.Log(logging.LevelError, "Failed to serialize state: %s", err.Error())
 		http.Error(rw, err.Error(), http.StatusInternalServerError)
@@ -704,7 +704,7 @@ func (toa *TraefikOidcAuth) redirectToProvider(rw http.ResponseWriter, req *http
 		clearLegacyCodeVerifierCookies(toa.Config, rw, req, toa.CallbackURL)
 	}
 
-	stateBase64, err := oidc.EncodeState(&state)
+	stateBase64, err := oidc.SealState(&state, toa.Config.Secret)
 	if err != nil {
 		toa.logger.Log(logging.LevelError, "Failed to serialize state: %s", err.Error())
 		http.Error(rw, err.Error(), http.StatusInternalServerError)
@@ -727,7 +727,7 @@ func (toa *TraefikOidcAuth) doubleRedirectToProvider(rw http.ResponseWriter, req
 		RedirectUrl: redirectUrl,
 	}
 
-	stateBase64, err := oidc.EncodeState(&state)
+	stateBase64, err := oidc.SealState(&state, toa.Config.Secret)
 	if err != nil {
 		toa.logger.Log(logging.LevelError, "Failed to serialize state: %s", err.Error())
 		http.Error(rw, err.Error(), http.StatusInternalServerError)

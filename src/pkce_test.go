@@ -43,13 +43,13 @@ func newPkceTestAuth(t *testing.T) *TraefikOidcAuth {
 	}
 }
 
-func decodeStateFromLocation(t *testing.T, location string) *oidc.OidcState {
+func decodeStateFromLocation(t *testing.T, location string, secret string) *oidc.OidcState {
 	t.Helper()
 	u, err := url.Parse(location)
 	if err != nil {
 		t.Fatal(err)
 	}
-	st, err := oidc.DecodeState(u.Query().Get("state"))
+	st, err := oidc.UnsealState(u.Query().Get("state"), secret)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -82,7 +82,7 @@ func TestRedirectToProvider_PkcePutsEncryptedVerifierInState(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	st := decodeStateFromLocation(t, loc.String())
+	st := decodeStateFromLocation(t, loc.String(), toa.Config.Secret)
 	if st.CodeVerifierEnc == "" {
 		t.Fatal("expected CodeVerifierEnc in state")
 	}
@@ -112,7 +112,7 @@ func TestRedirectToProvider_ParallelFlowsHaveDistinctVerifiers(t *testing.T) {
 		rw := httptest.NewRecorder()
 		req := httptest.NewRequest("GET", "https://app.example.com/page", nil)
 		toa.redirectToProvider(rw, req, "https://app.example.com/page")
-		st := decodeStateFromLocation(t, rw.Header().Get("Location"))
+		st := decodeStateFromLocation(t, rw.Header().Get("Location"), toa.Config.Secret)
 		plain, err := utils.Decrypt(st.CodeVerifierEnc, toa.Config.Secret)
 		if err != nil {
 			t.Fatal(err)
@@ -233,7 +233,7 @@ func TestHandleCallback_ClearsLegacyCookiesOnlyWhenPkceEnabled(t *testing.T) {
 				}
 				state.CodeVerifierEnc = enc
 			}
-			stateB64, err := oidc.EncodeState(state)
+			stateB64, err := oidc.SealState(state, toa.Config.Secret)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -274,7 +274,7 @@ func TestRedirectToProvider_StateSizeReasonable(t *testing.T) {
 		t.Fatal(err)
 	}
 	state := loc.Query().Get("state")
-	if len(state) > 3500 {
+	if len(state) > 5000 {
 		t.Fatalf("state too large: %d bytes", len(state))
 	}
 }
@@ -387,7 +387,7 @@ func TestDoubleRedirect_DoesNotSetPkceCookieOrChallenge(t *testing.T) {
 	if loc.Query().Get("code_challenge") != "" {
 		t.Fatal("double redirect must not send code_challenge to IdP")
 	}
-	st, err := oidc.DecodeState(loc.Query().Get("state"))
+	st, err := oidc.UnsealState(loc.Query().Get("state"), toa.Config.Secret)
 	if err != nil {
 		t.Fatal(err)
 	}
