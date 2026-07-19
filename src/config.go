@@ -43,6 +43,7 @@ func CreateConfig() *config.Config {
 		//Scopes:                []string{"openid", "profile", "email"},
 		CallbackUri:           "/oidc/callback",
 		LogoutUri:             "/logout",
+		FrontChannelLogoutUri: "/frontchannel-logout",
 		PostLogoutRedirectUri: "/",
 		CookieNamePrefix:      "TraefikOidcAuth",
 		SessionCookie: &config.SessionCookieConfig{
@@ -53,9 +54,11 @@ func CreateConfig() *config.Config {
 			SameSite: "lax",
 			MaxAge:   0,
 		},
-		AuthorizationHeader:  &config.AuthorizationHeaderConfig{},
-		AuthorizationCookie:  &config.AuthorizationCookieConfig{},
-		UnauthorizedBehavior: "Auto",
+		AuthorizationHeader: &config.AuthorizationHeaderConfig{},
+		AuthorizationCookie: &config.AuthorizationCookieConfig{},
+		// Leave empty so migrateAuthBehaviors can map legacy UnauthorizedBehavior.
+		UnauthenticatedBehavior: "",
+		UnauthorizedBehavior:    "",
 		Authorization: &config.AuthorizationConfig{
 			CheckOnEveryRequest: false,
 		},
@@ -93,8 +96,11 @@ func New(uctx context.Context, next http.Handler, cfg *config.Config, name strin
 	cfg.PostLoginRedirectUri = utils.ExpandEnvironmentVariableString(cfg.PostLoginRedirectUri)
 	cfg.LogoutUri = utils.ExpandEnvironmentVariableString(cfg.LogoutUri)
 	cfg.PostLogoutRedirectUri = utils.ExpandEnvironmentVariableString(cfg.PostLogoutRedirectUri)
+	cfg.FrontChannelLogoutUri = utils.ExpandEnvironmentVariableString(cfg.FrontChannelLogoutUri)
 	cfg.CookieNamePrefix = utils.ExpandEnvironmentVariableString(cfg.CookieNamePrefix)
+	cfg.UnauthenticatedBehavior = utils.ExpandEnvironmentVariableString(cfg.UnauthenticatedBehavior)
 	cfg.UnauthorizedBehavior = utils.ExpandEnvironmentVariableString(cfg.UnauthorizedBehavior)
+	migrateAuthBehaviors(cfg)
 	cfg.BypassAuthenticationRule = utils.ExpandEnvironmentVariableString(cfg.BypassAuthenticationRule)
 	cfg.Provider.Url = utils.ExpandEnvironmentVariableString(cfg.Provider.Url)
 	cfg.Provider.ClientId = utils.ExpandEnvironmentVariableString(cfg.Provider.ClientId)
@@ -278,4 +284,23 @@ func New(uctx context.Context, next http.Handler, cfg *config.Config, name strin
 		SessionStorage:           session.CreateCookieSessionStorage(),
 		BypassAuthenticationRule: conditionalAuth,
 	}, nil
+}
+
+// migrateAuthBehaviors maps legacy single UnauthorizedBehavior onto the split
+// UnauthenticatedBehavior / UnauthorizedBehavior fields when the new field is unset.
+// CreateConfig leaves both empty so Traefik overlays + this migrate run in New().
+func migrateAuthBehaviors(cfg *config.Config) {
+	if cfg.UnauthenticatedBehavior != "" {
+		if cfg.UnauthorizedBehavior == "" {
+			cfg.UnauthorizedBehavior = "Unauthorized"
+		}
+		return
+	}
+	cfg.UnauthenticatedBehavior = cfg.UnauthorizedBehavior
+	if cfg.UnauthenticatedBehavior == "" {
+		cfg.UnauthenticatedBehavior = "Auto"
+	}
+	if cfg.UnauthorizedBehavior != "Forward" {
+		cfg.UnauthorizedBehavior = "Unauthorized"
+	}
 }

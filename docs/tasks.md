@@ -19,12 +19,12 @@ Living checklist. Each task: ADR (if design choice) → implement → tests → 
 |------|--------|
 | [#170](https://github.com/sevensolutions/traefik-oidc-auth/issues/170) / [PR #283](https://github.com/sevensolutions/traefik-oidc-auth/pull/283) | Done on base branch (PKCE in state). Keep. |
 | [#259](https://github.com/sevensolutions/traefik-oidc-auth/issues/259) VerifierCookie domain | Mostly obsolete after ADR 0001; legacy clear remains. |
-| [PR #282](https://github.com/sevensolutions/traefik-oidc-auth/pull/282) Unauth behavior split | Valuable UX/authz; **deferred** (large, orthogonal). |
-| [PR #216](https://github.com/sevensolutions/traefik-oidc-auth/pull/216) Front-channel logout (draft) | **Deferred** (draft, scope). |
+| [PR #282](https://github.com/sevensolutions/traefik-oidc-auth/pull/282) Unauth behavior split | **DONE** (UnauthenticatedBehavior / UnauthorizedBehavior + Challenge once). |
+| [PR #216](https://github.com/sevensolutions/traefik-oidc-auth/pull/216) Front-channel logout (draft) | **DONE** (hardened: require `iss`, never clear on empty iss). |
 | [#236](https://github.com/sevensolutions/traefik-oidc-auth/issues/236) `nbf` / clock skew | **Done** (Task 6, `TokenClockSkewSeconds` default 60). |
-| [#195](https://github.com/sevensolutions/traefik-oidc-auth/issues/195) `expires_in` validation mode | Deferred. |
-| [#275](https://github.com/sevensolutions/traefik-oidc-auth/issues/275) camelCase keys | Skipped (Traefik catalog constraint). |
-| [#87](https://github.com/sevensolutions/traefik-oidc-auth/issues/87) / [#262](https://github.com/sevensolutions/traefik-oidc-auth/issues/262) Redis / in-memory sessions | Out of scope. |
+| [#195](https://github.com/sevensolutions/traefik-oidc-auth/issues/195) `expires_in` validation mode | **SKIP** — see deferred decisions. |
+| [#275](https://github.com/sevensolutions/traefik-oidc-auth/issues/275) camelCase keys | **SKIP** — see deferred decisions. |
+| [#87](https://github.com/sevensolutions/traefik-oidc-auth/issues/87) / [#262](https://github.com/sevensolutions/traefik-oidc-auth/issues/262) Redis / in-memory sessions | **SKIP** — see deferred decisions. |
 
 ## Tasks
 
@@ -69,13 +69,33 @@ Living checklist. Each task: ADR (if design choice) → implement → tests → 
 - [x] Update `docs/adr/README.md` for 0002–0004
 - [x] Mark tasks done in this file
 
+### Task 8 — UnauthenticatedBehavior / UnauthorizedBehavior split (PR #282)
+
+- [x] `UnauthenticatedBehavior` (401 path, default Auto) separate from `UnauthorizedBehavior` (403 path, default Unauthorized)
+- [x] Legacy migration when `UnauthenticatedBehavior` empty; Challenge-once via `ChallengeAttempted` + `state.IsChallenge`
+- [x] Unit tests for migration + Challenge once
+
+### Task 9 — Hardened front-channel logout (improve PR #216)
+
+- [x] `FrontChannelLogoutUri` default `/frontchannel-logout`
+- [x] Require `iss`; optional `sid` with constant-time match; never clear session on empty `iss`
+- [x] No-session path returns 200 without clearing cookies
+
+## Deferred follow-ups — decisions
+
+| Item | Decision | Reason |
+|------|----------|--------|
+| Redis / in-memory session storage (#87/#262) | **SKIP** | Yaegi plugin + multi-replica Traefik needs shared store; cookie sessions remain. Skip to avoid new deps and false sense of scale. |
+| camelCase CRD keys (#275) | **SKIP** | Traefik plugin catalog / existing PascalCase convention. |
+| PAR / DPoP / JAR | **SKIP** | Overkill for middleware. |
+| TokenValidation via `expires_in` only (#195) | **SKIP** (deferred) | Session already uses `ExpiresIn` for renewal threshold; full new validation mode deferred. |
+
 ## Explicitly out of scope (this branch)
 
-- UnauthorizedBehavior split (PR #282)
-- Front-channel logout (PR #216)
 - Redis / in-memory session backends
 - PAR, DPoP, JAR
 - camelCase Traefik CRD keys (#275)
+- Full `expires_in`-only TokenValidation mode (#195)
 
 ## Migration notes
 
@@ -84,6 +104,7 @@ Living checklist. Each task: ADR (if design choice) → implement → tests → 
 3. **SameSite:** session cookie default is `lax` (was `default`).
 4. **State format:** sealed (encrypted). In-flight logins during upgrade fail once; users re-login.
 5. **Nonce:** IdP must return `nonce` in ID token when `TokenValidation=IdToken` (disable with `ValidateNonce: false` if needed).
+6. **Behavior split:** old `UnauthorizedBehavior` alone migrates into `UnauthenticatedBehavior`; 403 default becomes `Unauthorized` unless old value was `Forward` (preserved for both). Set `UnauthorizedBehavior: Challenge` to opt into one-shot step-up redirect.
 
 ## Progress log
 
@@ -93,3 +114,4 @@ Living checklist. Each task: ADR (if design choice) → implement → tests → 
 | 2026-07-19 | `4068baa` | ADR 0002 sealed state |
 | 2026-07-19 | `43ae810` | ADR 0003 login CSRF |
 | 2026-07-19 | `4feab63` | Tasks 3–7 (nonce, defaults, redirect, leeway) |
+| 2026-07-19 | `feat(oidc): split auth behaviors + harden frontchannel` | Task 8–9: behavior split + hardened frontchannel |

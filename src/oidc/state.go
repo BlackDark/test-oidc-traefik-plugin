@@ -18,6 +18,8 @@ type OidcState struct {
 	Csrf string `json:"csrf,omitempty"`
 	// Nonce is the OIDC nonce for ID token binding (ADR 0004).
 	Nonce string `json:"nonce,omitempty"`
+	// IsChallenge is set when login was triggered by UnauthorizedBehavior Challenge (authorization re-check).
+	IsChallenge bool `json:"is_challenge,omitempty"`
 }
 
 // SealState encrypts the full OidcState with Secret and returns a RawURL-safe opaque state string (ADR 0002).

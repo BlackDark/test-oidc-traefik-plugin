@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/rsa"
 	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -132,7 +133,7 @@ func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 	}
 
 	if toa.Config.LoginUri != "" && strings.HasPrefix(req.RequestURI, toa.Config.LoginUri) {
-		toa.handleLogin(rw, req)
+		toa.handleLogin(rw, req, false, "")
 		return
 	}
 
@@ -145,6 +146,11 @@ func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 			return
 		}
 
+		if toa.Config.FrontChannelLogoutUri != "" && strings.HasPrefix(req.RequestURI, toa.Config.FrontChannelLogoutUri) {
+			toa.handleFrontchannelLogout(rw, req, session, claims)
+			return
+		}
+
 		// If this request is using external authentication by using a header or custom cookie,
 		// we need to validate the authorization on every request.
 		// Ensure the session is authorized
@@ -153,7 +159,7 @@ func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 		}
 
 		if !session.IsAuthorized && toa.Config.UnauthorizedBehavior != "Forward" {
-			toa.handleUnauthorized(rw, req)
+			toa.handleUnauthorized(rw, req, session, "")
 			return
 		}
 
@@ -178,6 +184,12 @@ func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 		toa.next.ServeHTTP(rw, req)
 		return
 	} else {
+		if toa.Config.FrontChannelLogoutUri != "" && strings.HasPrefix(req.RequestURI, toa.Config.FrontChannelLogoutUri) {
+			// Idempotent: already logged out / no session. Do not clear cookies or require auth.
+			toa.writeSuccessfulLogout(rw, req)
+			return
+		}
+
 		toa.logger.Log(logging.LevelInfo, "Verifying token: %s", err.Error())
 
 		// Clear the session cookie
@@ -424,13 +436,14 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 		isAuthorized := isAuthorized(toa.logger, toa.Config.Authorization, claims)
 
 		session := &session.SessionState{
-			Id:             session.GenerateSessionId(),
-			RefreshedAt:    time.Now(),
-			AccessToken:    token.AccessToken,
-			IdToken:        token.IdToken,
-			RefreshToken:   token.RefreshToken,
-			IsAuthorized:   isAuthorized,
-			TokenExpiresIn: token.ExpiresIn,
+			Id:                 session.GenerateSessionId(),
+			RefreshedAt:        time.Now(),
+			AccessToken:        token.AccessToken,
+			IdToken:            token.IdToken,
+			RefreshToken:       token.RefreshToken,
+			IsAuthorized:       isAuthorized,
+			TokenExpiresIn:     token.ExpiresIn,
+			ChallengeAttempted: state.IsChallenge,
 		}
 
 		toa.storeSessionAndAttachCookie(session, rw)
@@ -456,7 +469,8 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 		}
 
 		if !isAuthorized {
-			toa.handleUnauthorized(rw, req)
+			// req is the callback URL — pass original destination for Challenge re-login.
+			toa.handleUnauthorized(rw, req, session, redirectUrl)
 			return
 		}
 
@@ -466,7 +480,7 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 		// Clear the cookie
 		clearChunkedCookie(toa.Config, rw, req, getSessionCookieName(toa.Config))
 	} else if state.Action == "RedirectThenLogin" {
-		toa.redirectToProvider(rw, req, redirectUrl)
+		toa.redirectToProvider(rw, req, redirectUrl, state.IsChallenge)
 		return
 	}
 
@@ -530,11 +544,81 @@ func (toa *TraefikOidcAuth) handleLogout(rw http.ResponseWriter, req *http.Reque
 	http.Redirect(rw, req, endSessionURL.String(), http.StatusFound)
 }
 
+func secureStringEqual(a, b string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	return subtle.ConstantTimeCompare([]byte(a), []byte(b)) == 1
+}
+
+// handleFrontchannelLogout implements OpenID Connect Front-Channel Logout 1.0 with hardened checks.
+// Requires non-empty iss; never clears the session when iss is missing (fixes PR #216).
+func (toa *TraefikOidcAuth) handleFrontchannelLogout(rw http.ResponseWriter, req *http.Request, session *session.SessionState, claims map[string]interface{}) {
+	toa.logger.Log(logging.LevelInfo, "Handling frontchannel logout...")
+
+	iss := req.URL.Query().Get("iss")
+	if iss == "" {
+		toa.logger.Log(logging.LevelWarn, "Frontchannel logout rejected: iss is missing")
+		http.Error(rw, "iss is missing", http.StatusBadRequest)
+		return
+	}
+
+	claimIss, ok := claims["iss"].(string)
+	if !ok || !secureStringEqual(iss, claimIss) {
+		toa.logger.Log(logging.LevelWarn, "Frontchannel logout rejected: iss does not match")
+		http.Error(rw, "iss does not match", http.StatusBadRequest)
+		return
+	}
+
+	if toa.Config.Provider.ValidateIssuerBool && toa.Config.Provider.ValidIssuer != "" {
+		if !secureStringEqual(iss, toa.Config.Provider.ValidIssuer) {
+			toa.logger.Log(logging.LevelWarn, "Frontchannel logout rejected: iss does not match ValidIssuer")
+			http.Error(rw, "iss does not match", http.StatusBadRequest)
+			return
+		}
+	}
+
+	sid := req.URL.Query().Get("sid")
+	if sid != "" {
+		claimSid, ok := claims["sid"].(string)
+		if !ok {
+			toa.logger.Log(logging.LevelWarn, "Frontchannel logout rejected: sid provided but claims lack sid")
+			http.Error(rw, "sid does not match", http.StatusBadRequest)
+			return
+		}
+		if !secureStringEqual(sid, claimSid) {
+			toa.logger.Log(logging.LevelWarn, "Frontchannel logout rejected: sid does not match")
+			http.Error(rw, "sid does not match", http.StatusBadRequest)
+			return
+		}
+	}
+
+	clearChunkedCookie(toa.Config, rw, req, getSessionCookieName(toa.Config))
+	toa.writeSuccessfulLogout(rw, req)
+}
+
+func (toa *TraefikOidcAuth) writeSuccessfulLogout(rw http.ResponseWriter, req *http.Request) {
+	rw.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+
+	data := make(map[string]interface{})
+	data["statusType"] = "about:blank"
+	data["statusCode"] = http.StatusOK
+	data["statusName"] = "Logged out"
+	data["description"] = "You have been logged out successfully."
+
+	if toa.Config.LoginUri != "" {
+		data["primaryButtonText"] = "Log back in"
+		data["primaryButtonUrl"] = utils.EnsureAbsoluteUrl(req, toa.Config.LoginUri)
+	}
+
+	errorPages.WriteError(toa.logger, &errorPages.ErrorPageConfig{}, rw, req, data)
+}
+
 func (toa *TraefikOidcAuth) handleUnauthenticated(rw http.ResponseWriter, req *http.Request) {
-	switch toa.Config.UnauthorizedBehavior {
+	switch toa.Config.UnauthenticatedBehavior {
 	case "Challenge":
 		// Handle login
-		toa.handleLogin(rw, req)
+		toa.handleLogin(rw, req, false, "")
 	case "Unauthorized":
 		// Respond with 401 Unauthorized
 		toa.writeUnauthenticatedError(rw, req)
@@ -545,7 +629,7 @@ func (toa *TraefikOidcAuth) handleUnauthenticated(rw http.ResponseWriter, req *h
 	case "Auto":
 		if utils.IsHtmlRequest(req) {
 			// Handle login for HTML requests
-			toa.handleLogin(rw, req)
+			toa.handleLogin(rw, req, false, "")
 		} else {
 			// Respond with 401 Unauthorized for non-HTML requests
 			toa.writeUnauthenticatedError(rw, req)
@@ -572,8 +656,29 @@ func (toa *TraefikOidcAuth) writeUnauthenticatedError(rw http.ResponseWriter, re
 	errorPages.WriteError(toa.logger, toa.Config.ErrorPages.Unauthenticated, rw, req, data)
 }
 
-func (toa *TraefikOidcAuth) handleUnauthorized(rw http.ResponseWriter, req *http.Request) {
-	toa.writeUnauthorizedError(rw, req)
+// handleUnauthorized handles a valid session that fails Authorization rules.
+// redirectUrlOverride is empty on normal requests; from handleCallback it is the original destination.
+func (toa *TraefikOidcAuth) handleUnauthorized(rw http.ResponseWriter, req *http.Request, session *session.SessionState, redirectUrlOverride string) {
+	switch toa.Config.UnauthorizedBehavior {
+	case "Challenge":
+		if !session.ChallengeAttempted && utils.IsHtmlRequest(req) {
+			toa.handleLogin(rw, req, true, redirectUrlOverride)
+		} else {
+			toa.writeUnauthorizedError(rw, req)
+		}
+	case "Unauthorized":
+		toa.writeUnauthorizedError(rw, req)
+	case "Forward":
+		// Never forward the OAuth callback URL (code/state leak). Redirect to app instead.
+		if redirectUrlOverride != "" {
+			http.Redirect(rw, req, redirectUrlOverride, http.StatusFound)
+			return
+		}
+		toa.sanitizeForUpstream(req)
+		toa.next.ServeHTTP(rw, req)
+	default:
+		toa.writeUnauthorizedError(rw, req)
+	}
 }
 
 func (toa *TraefikOidcAuth) writeUnauthorizedError(rw http.ResponseWriter, req *http.Request) {
@@ -595,36 +700,42 @@ func (toa *TraefikOidcAuth) writeUnauthorizedError(rw http.ResponseWriter, req *
 	errorPages.WriteError(toa.logger, toa.Config.ErrorPages.Unauthorized, rw, req, data)
 }
 
-func (toa *TraefikOidcAuth) handleLogin(rw http.ResponseWriter, req *http.Request) {
+// handleLogin starts the OIDC login flow. Non-empty redirectUrlOverride wins over request-derived targets
+// (used when re-challenging from handleCallback where req is the callback URL).
+func (toa *TraefikOidcAuth) handleLogin(rw http.ResponseWriter, req *http.Request, isChallenge bool, redirectUrlOverride string) {
 	toa.logger.Log(logging.LevelInfo, "Logging in...")
 	var redirectUrl string
 
-	// If the user specified one on the /login request, use this one
-	redirectUriFromQuery, err := utils.ValidateRedirectUri(req.URL.Query().Get("redirect_uri"), toa.Config.ValidPostLoginRedirectUris)
-	if err != nil {
-		toa.logger.Log(logging.LevelError, "%s", err.Error())
-		http.Error(rw, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	if toa.Config.LoginUri != "" && strings.HasPrefix(req.RequestURI, toa.Config.LoginUri) && redirectUriFromQuery != "" {
-		redirectUrl = redirectUriFromQuery
-	} else if toa.Config.PostLoginRedirectUri != "" {
-		redirectUrl = utils.EnsureAbsoluteUrl(req, toa.Config.PostLoginRedirectUri)
+	if redirectUrlOverride != "" {
+		redirectUrl = redirectUrlOverride
 	} else {
-		host := utils.GetFullHost(req)
-		redirectUrl = fmt.Sprintf("%s%s", host, req.RequestURI)
+		// If the user specified one on the /login request, use this one
+		redirectUriFromQuery, err := utils.ValidateRedirectUri(req.URL.Query().Get("redirect_uri"), toa.Config.ValidPostLoginRedirectUris)
+		if err != nil {
+			toa.logger.Log(logging.LevelError, "%s", err.Error())
+			http.Error(rw, err.Error(), http.StatusBadRequest)
+			return
+		}
 
-		// Special case: If someone just calls /login but doesn't provide a redirect_uri, we go to / instead of /login again.
-		if toa.Config.LoginUri != "" && strings.HasPrefix(req.RequestURI, toa.Config.LoginUri) {
-			redirectUrl = host
+		if toa.Config.LoginUri != "" && strings.HasPrefix(req.RequestURI, toa.Config.LoginUri) && redirectUriFromQuery != "" {
+			redirectUrl = redirectUriFromQuery
+		} else if toa.Config.PostLoginRedirectUri != "" {
+			redirectUrl = utils.EnsureAbsoluteUrl(req, toa.Config.PostLoginRedirectUri)
+		} else {
+			host := utils.GetFullHost(req)
+			redirectUrl = fmt.Sprintf("%s%s", host, req.RequestURI)
+
+			// Special case: If someone just calls /login but doesn't provide a redirect_uri, we go to / instead of /login again.
+			if toa.Config.LoginUri != "" && strings.HasPrefix(req.RequestURI, toa.Config.LoginUri) {
+				redirectUrl = host
+			}
 		}
 	}
 
 	if toa.needsDoubleRedirect(req) {
-		toa.doubleRedirectToProvider(rw, req, redirectUrl)
+		toa.doubleRedirectToProvider(rw, req, redirectUrl, isChallenge)
 	} else {
-		toa.redirectToProvider(rw, req, redirectUrl)
+		toa.redirectToProvider(rw, req, redirectUrl, isChallenge)
 	}
 }
 
@@ -653,7 +764,7 @@ var reservedAuthorizationParams = map[string]bool{
 	"nonce":                 true,
 }
 
-func (toa *TraefikOidcAuth) redirectToProvider(rw http.ResponseWriter, req *http.Request, redirectUrl string) {
+func (toa *TraefikOidcAuth) redirectToProvider(rw http.ResponseWriter, req *http.Request, redirectUrl string, isChallenge bool) {
 	toa.logger.Log(logging.LevelInfo, "Redirecting to OIDC provider...")
 
 	callbackUrl := toa.GetAbsoluteCallbackURL(req).String()
@@ -661,6 +772,7 @@ func (toa *TraefikOidcAuth) redirectToProvider(rw http.ResponseWriter, req *http
 	state := oidc.OidcState{
 		Action:      "Login",
 		RedirectUrl: redirectUrl,
+		IsChallenge: isChallenge,
 	}
 
 	csrf, err := randomBytesInHex(16)
@@ -753,7 +865,7 @@ func (toa *TraefikOidcAuth) redirectToProvider(rw http.ResponseWriter, req *http
 	http.Redirect(rw, req, authorizationEndpointUrl.String(), http.StatusFound)
 }
 
-func (toa *TraefikOidcAuth) doubleRedirectToProvider(rw http.ResponseWriter, req *http.Request, redirectUrl string) {
+func (toa *TraefikOidcAuth) doubleRedirectToProvider(rw http.ResponseWriter, req *http.Request, redirectUrl string, isChallenge bool) {
 	toa.logger.Log(logging.LevelInfo, "Redirecting to OIDC provider via callback URL...")
 
 	callbackUrl := toa.GetAbsoluteCallbackURL(req)
@@ -761,6 +873,7 @@ func (toa *TraefikOidcAuth) doubleRedirectToProvider(rw http.ResponseWriter, req
 	state := oidc.OidcState{
 		Action:      "RedirectThenLogin",
 		RedirectUrl: redirectUrl,
+		IsChallenge: isChallenge,
 	}
 
 	stateBase64, err := oidc.SealState(&state, toa.Config.Secret)
