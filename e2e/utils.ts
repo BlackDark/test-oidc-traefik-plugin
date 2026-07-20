@@ -30,9 +30,10 @@ async function fetchJson<T>(url: string): Promise<T | null> {
 async function fileRouterNames(): Promise<string[] | null> {
   const routers = await fetchJson<TraefikRouter[]>(ROUTERS_API);
   if (!Array.isArray(routers)) return null;
-  return routers
-    .filter((r) => r.provider === 'file' && typeof r.name === 'string')
-    .map((r) => r.name!.replace(/@file$/, ''));
+  return routers.flatMap((r) => {
+    if (r.provider !== 'file' || typeof r.name !== 'string') return [];
+    return [r.name.replace(/@file$/, '')];
+  });
 }
 
 async function fileOidcPrefixes(): Promise<string[] | null> {
@@ -70,8 +71,7 @@ export async function configureTraefik(yaml: string) {
       routers.length === expectedRouters.length &&
       expectedRouters.every((name, i) => name === routers[i]);
 
-    const middlewaresReady =
-      prefixes.length > 0 && prefixes.every((prefix) => prefix === marker);
+    const middlewaresReady = prefixes.length > 0 && prefixes.every((prefix) => prefix === marker);
 
     if (routersReady && middlewaresReady) {
       await new Promise((r) => setTimeout(r, 200));
