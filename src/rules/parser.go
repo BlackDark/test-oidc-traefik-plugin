@@ -32,18 +32,16 @@ func NewParser(matchers []string) (predicate.Parser, error) {
 	parserFuncs := make(map[string]interface{})
 
 	for _, matcherName := range matchers {
-		// Fix for https://github.com/traefik/yaegi/discussions/1643
-		// We need to capture the variable manually.
-
-		fn := func(value ...string) TreeBuilder {
+		// Yaegi still shares loop variables across closures; bind explicitly.
+		name := matcherName
+		parserFuncs[name] = func(value ...string) TreeBuilder {
 			return func() *Tree {
 				return &Tree{
-					Matcher: matcherName,
+					Matcher: name,
 					Value:   value,
 				}
 			}
 		}
-		parserFuncs[matcherName] = fn
 	}
 
 	return predicate.NewParser(predicate.Def{

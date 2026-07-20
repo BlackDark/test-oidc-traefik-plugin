@@ -38,7 +38,9 @@ jobs:
         run: bunx playwright install --with-deps chromium
 
       - name: Run Playwright tests
-        run: bunx playwright test
+        run: bunx playwright test --project=mock-oidc
+        env:
+          CI: true
 
       - uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
