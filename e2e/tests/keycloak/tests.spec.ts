@@ -30,6 +30,7 @@ http:
       plugin:
         traefik-oidc-auth:
           LogLevel: DEBUG
+          Secret: "0123456789abcdef0123456789abcdef"
           Provider:
             Url: "\${PROVIDER_URL_HTTP}"
             ClientId: "\${CLIENT_ID}"
@@ -139,6 +140,7 @@ http:
       plugin:
         traefik-oidc-auth:
           LogLevel: DEBUG
+          Secret: "0123456789abcdef0123456789abcdef"
           Provider:
             Url: "\${PROVIDER_URL_HTTP}"
             ClientId: "\${CLIENT_ID}"
@@ -189,6 +191,7 @@ http:
       plugin:
         traefik-oidc-auth:
           LogLevel: DEBUG
+          Secret: "0123456789abcdef0123456789abcdef"
           Provider:
             Url: "\${PROVIDER_URL_HTTP}"
             ClientId: "\${CLIENT_ID}"
@@ -239,6 +242,7 @@ http:
       plugin:
         traefik-oidc-auth:
           LogLevel: DEBUG
+          Secret: "0123456789abcdef0123456789abcdef"
           Provider:
             Url: "\${PROVIDER_URL_HTTP}"
             ClientId: "\${CLIENT_ID}"
@@ -278,6 +282,7 @@ http:
       plugin:
         traefik-oidc-auth:
           LogLevel: DEBUG
+          Secret: "0123456789abcdef0123456789abcdef"
           Provider:
             Url: "\${PROVIDER_URL_HTTP}"
             ClientId: "\${CLIENT_ID}"
@@ -326,6 +331,7 @@ http:
       plugin:
         traefik-oidc-auth:
           LogLevel: DEBUG
+          Secret: "0123456789abcdef0123456789abcdef"
           Provider:
             Url: "\${PROVIDER_URL_HTTPS}"
             CABundleFile: "/certificates/bundle/ca_bundle.pem"
@@ -371,6 +377,7 @@ http:
       plugin:
         traefik-oidc-auth:
           LogLevel: DEBUG
+          Secret: "0123456789abcdef0123456789abcdef"
           Provider:
             Url: "\${PROVIDER_URL_HTTPS}"
             CABundle: "base64:${base64CertBundle}"
@@ -479,6 +486,7 @@ http:
       plugin:
         traefik-oidc-auth:
           LogLevel: DEBUG
+          Secret: "0123456789abcdef0123456789abcdef"
           Provider:
             Url: "\${PROVIDER_URL_HTTP}"
             ClientId: "\${CLIENT_ID}"
@@ -530,6 +538,7 @@ test('external authentication', async ({ page }) => {
           plugin:
             traefik-oidc-auth:
               LogLevel: DEBUG
+              Secret: "0123456789abcdef0123456789abcdef"
               Provider:
                 Url: "\${PROVIDER_URL_HTTP}"
                 ClientId: "\${CLIENT_ID}"
@@ -608,6 +617,7 @@ test('external authentication with authorization rules', async ({ page }) => {
           plugin:
             traefik-oidc-auth:
               LogLevel: DEBUG
+              Secret: "0123456789abcdef0123456789abcdef"
               Provider:
                 Url: "\${PROVIDER_URL_HTTP}"
                 ClientId: "\${CLIENT_ID}"
@@ -668,6 +678,7 @@ http:
       plugin:
         traefik-oidc-auth:
           LogLevel: DEBUG
+          Secret: "0123456789abcdef0123456789abcdef"
           Provider:
             Url: "\${PROVIDER_URL_HTTP}"
             ClientId: "\${CLIENT_ID}"
@@ -717,6 +728,7 @@ http:
       plugin:
         traefik-oidc-auth:
           LogLevel: DEBUG
+          Secret: "0123456789abcdef0123456789abcdef"
           Provider:
             Url: "\${PROVIDER_URL_HTTP}"
             ClientId: "\${CLIENT_ID}"
@@ -765,6 +777,7 @@ http:
       plugin:
         traefik-oidc-auth:
           LogLevel: DEBUG
+          Secret: "0123456789abcdef0123456789abcdef"
           Provider:
             Url: "\${PROVIDER_URL_HTTP}"
             ClientId: "\${CLIENT_ID}"
@@ -779,6 +792,7 @@ http:
       plugin:
         traefik-oidc-auth:
           LogLevel: DEBUG
+          Secret: "0123456789abcdef0123456789abcdef"
           Provider:
             Url: "\${PROVIDER_URL_HTTP}"
             ClientId: "\${CLIENT_ID}"
@@ -794,6 +808,7 @@ http:
       plugin:
         traefik-oidc-auth:
           LogLevel: DEBUG
+          Secret: "0123456789abcdef0123456789abcdef"
           Provider:
             Url: "\${PROVIDER_URL_HTTP}"
             ClientId: "\${CLIENT_ID}"
