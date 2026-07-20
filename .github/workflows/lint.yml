@@ -37,6 +37,26 @@ jobs:
           working-directory: .
           args: ./src/...
 
+  govulncheck:
+    name: Go (govulncheck)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Setup Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: govulncheck
+        run: go run golang.org/x/vuln/cmd/govulncheck@latest ./src/...
+
   website:
     name: Website (Biome)
     runs-on: ubuntu-latest

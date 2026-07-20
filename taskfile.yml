@@ -55,12 +55,17 @@ tasks:
     desc: 'Run all linters'
     deps:
       - lint:go
+      - lint:sec
       - lint:website
       - lint:e2e
   lint:go:
     desc: 'Lint and check Go formatting'
     cmds:
       - golangci-lint run ./src/...
+  lint:sec:
+    desc: 'Go vulnerability check (govulncheck)'
+    cmds:
+      - go run golang.org/x/vuln/cmd/govulncheck@latest ./src/...
   lint:website:
     desc: 'Lint website with Biome'
     dir: 'website'

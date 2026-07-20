@@ -174,7 +174,7 @@ func clearLegacyCodeVerifierCookies(config *config.Config, rw http.ResponseWrite
 			HttpOnly: true,
 			Path:     callbackURL.Path,
 			Domain:   cookieDomain,
-			SameSite: http.SameSiteDefaultMode,
+			SameSite: http.SameSiteLaxMode,
 		}))
 	}
 

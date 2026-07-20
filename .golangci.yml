@@ -13,6 +13,7 @@ linters:
     - errorlint
     - forcetypeassert
     - gocritic
+    - gosec
     - misspell
     - nilerr
     - nilnesserr
@@ -26,6 +27,14 @@ linters:
     - usestdlibvars
     - whitespace
   settings:
+    gosec:
+      # Intentional for this middleware; see SECURITY.md / New() hardening.
+      excludes:
+        - G101 # DefaultSecret sentinel refused at startup
+        - G117 # Encrypted session cookie must carry tokens
+        - G124 # Cookie flags come from SessionCookie config
+        - G402 # Provider.InsecureSkipVerify is explicit opt-in
+        - G710 # Post-login redirects gated by ValidPostLoginRedirectUris / state
     revive:
       rules:
         - name: blank-imports
@@ -59,6 +68,7 @@ linters:
         linters:
           - errcheck
           - forcetypeassert
+          - gosec
           - noctx
           - unparam
       - text: "ifElseChain"
