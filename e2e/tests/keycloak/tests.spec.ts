@@ -420,6 +420,7 @@ http:
       plugin:
         traefik-oidc-auth:
           LogLevel: DEBUG
+          Secret: "0123456789abcdef0123456789abcdef"
           LoginUri: "/login"
           Provider:
             Url: "\${PROVIDER_URL_HTTP}"
