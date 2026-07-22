@@ -23,7 +23,7 @@ Living checklist. Each task: ADR (if design choice) → implement → tests → 
 | [PR #216](https://github.com/sevensolutions/traefik-oidc-auth/pull/216) Front-channel logout (draft) | **DONE** (hardened: require `iss`, never clear on empty iss). |
 | [#236](https://github.com/sevensolutions/traefik-oidc-auth/issues/236) `nbf` / clock skew | **Done** (Task 6, `TokenClockSkewSeconds` default 60). |
 | [#195](https://github.com/sevensolutions/traefik-oidc-auth/issues/195) `expires_in` validation mode | **SKIP** — see deferred decisions. |
-| [#275](https://github.com/sevensolutions/traefik-oidc-auth/issues/275) camelCase keys | **SKIP** — see deferred decisions. |
+| [#275](https://github.com/sevensolutions/traefik-oidc-auth/issues/275) camelCase keys | **DONE** — docs/examples use camelCase; decoder remains case-insensitive. |
 | [#87](https://github.com/sevensolutions/traefik-oidc-auth/issues/87) / [#262](https://github.com/sevensolutions/traefik-oidc-auth/issues/262) Redis / in-memory sessions | **SKIP** — see deferred decisions. |
 
 ## Tasks
@@ -86,7 +86,7 @@ Living checklist. Each task: ADR (if design choice) → implement → tests → 
 | Item | Decision | Reason |
 |------|----------|--------|
 | Redis / in-memory session storage (#87/#262) | **SKIP** | Yaegi plugin + multi-replica Traefik needs shared store; cookie sessions remain. Skip to avoid new deps and false sense of scale. |
-| camelCase CRD keys (#275) | **SKIP** | Traefik plugin catalog / existing PascalCase convention. |
+| camelCase CRD keys (#275) | **DONE** | Docs/examples migrated to camelCase; Traefik mapstructure match is case-insensitive so PascalCase still works. |
 | PAR / DPoP / JAR | **SKIP** | Overkill for middleware. |
 | TokenValidation via `expires_in` only (#195) | **SKIP** (deferred) | Session already uses `ExpiresIn` for renewal threshold; full new validation mode deferred. |
 
@@ -94,7 +94,6 @@ Living checklist. Each task: ADR (if design choice) → implement → tests → 
 
 - Redis / in-memory session backends
 - PAR, DPoP, JAR
-- camelCase Traefik CRD keys (#275)
 - Full `expires_in`-only TokenValidation mode (#195)
 
 ## Migration notes

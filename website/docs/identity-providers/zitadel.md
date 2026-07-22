@@ -49,11 +49,11 @@ http:
     oidc-auth:
       plugin:
         traefik-oidc-auth:
-          Provider:
-            Url: "https://your-instance.zitadel.cloud"
-            ClientId: "<YourClientId>"
-            UsePkce: true
-          Scopes: ["openid", "profile", "email"]
+          provider:
+            url: "https://your-instance.zitadel.cloud"
+            clientId: "<YourClientId>"
+            usePkce: true
+          scopes: ["openid", "profile", "email"]
 ```
 
   </TabItem>
@@ -65,11 +65,11 @@ http:
     oidc-auth:
       plugin:
         traefik-oidc-auth:
-          Provider:
-            Url: "https://your-instance.zitadel.cloud"
-            ClientId: "<YourClientId>"
-            ClientSecret: "<YourClientSecret>"
-          Scopes: ["openid", "profile", "email"]
+          provider:
+            url: "https://your-instance.zitadel.cloud"
+            clientId: "<YourClientId>"
+            clientSecret: "<YourClientSecret>"
+          scopes: ["openid", "profile", "email"]
 ```
 
   </TabItem>
@@ -125,16 +125,16 @@ http:
     oidc-auth:
       plugin:
         traefik-oidc-auth:
-          Provider:
-            Url: "https://your-instance.zitadel.cloud"
-            ClientId: "<YourClientId>"
-            UsePkce: true
-          Scopes: ["openid", "profile", "email"]
+          provider:
+            url: "https://your-instance.zitadel.cloud"
+            clientId: "<YourClientId>"
+            usePkce: true
+          scopes: ["openid", "profile", "email"]
           # highlight-start
-          Authorization:
-            AssertClaims:
-              - Name: roles
-                AnyOf: ["admin", "media"]
+          authorization:
+            assertClaims:
+              - name: roles
+                anyOf: ["admin", "media"]
           # highlight-end
 ```
 

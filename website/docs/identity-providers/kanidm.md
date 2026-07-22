@@ -83,11 +83,11 @@ http:
     oidc-auth:
       plugin:
         traefik-oidc-auth:
-          Provider:
-            Url: "https://idm.example.com/oauth2/openid/<client_id>"
-            ClientId: "<client_id>"
-            UsePkce: true
-          Scopes: ["openid", "profile"]
+          provider:
+            url: "https://idm.example.com/oauth2/openid/<client_id>"
+            clientId: "<client_id>"
+            usePkce: true
+          scopes: ["openid", "profile"]
 ```
 
   </TabItem>
@@ -99,11 +99,11 @@ http:
     oidc-auth:
       plugin:
         traefik-oidc-auth:
-          Provider:
-            Url: "https://idm.example.com/oauth2/openid/<client_id>"
-            ClientId: "<client_id>"
-            ClientSecret: "<client_secret>"
-          Scopes: ["openid", "profile"]
+          provider:
+            url: "https://idm.example.com/oauth2/openid/<client_id>"
+            clientId: "<client_id>"
+            clientSecret: "<client_secret>"
+          scopes: ["openid", "profile"]
 ```
 
   </TabItem>
@@ -115,25 +115,25 @@ http:
     oidc-auth:
       plugin:
         traefik-oidc-auth:
-          LogLevel: DEBUG
-          CallbackUri: "https://login.example.com/oidc/callback"
-          SessionCookie:
-            Domain: ".example.com"
-          Provider:
-            Url: "https://idm.example.com/oauth2/openid/<client_id>"
-            ClientId: "<client_id>"
-            ClientSecret: "<client_secret>"
-            UsePkce: false
-          Scopes: ["openid", "profile", "email", "groups"]
-          Headers:
-            - Name: "Remote-User"
-              Value: "{{`{{ .claims.preferred_username }}`}}"
-            - Name: "Remote-Email"
-              Value: "{{`{{ .claims.email }}`}}"
-            - Name: "Remote-Groups"
-              Value: "{{`{{ .claims.groups }}`}}"
-            - Name: "Remote-Name"
-              Value: "{{`{{ .claims.name }}`}}"
+          logLevel: DEBUG
+          callbackUri: "https://login.example.com/oidc/callback"
+          sessionCookie:
+            domain: ".example.com"
+          provider:
+            url: "https://idm.example.com/oauth2/openid/<client_id>"
+            clientId: "<client_id>"
+            clientSecret: "<client_secret>"
+            usePkce: false
+          scopes: ["openid", "profile", "email", "groups"]
+          headers:
+            - name: "Remote-User"
+              value: "{{`{{ .claims.preferred_username }}`}}"
+            - name: "Remote-Email"
+              value: "{{`{{ .claims.email }}`}}"
+            - name: "Remote-Groups"
+              value: "{{`{{ .claims.groups }}`}}"
+            - name: "Remote-Name"
+              value: "{{`{{ .claims.name }}`}}"
 
   routers:
     auth:

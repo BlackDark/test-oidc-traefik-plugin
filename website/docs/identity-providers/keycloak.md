@@ -30,10 +30,10 @@ http:
     oidc-auth:
       plugin:
         traefik-oidc-auth:
-          Provider:
-            Url: "https://login.my-keycloak.com/realms/<myRealm>"
-            ClientId: "<YourClientId>"
-            ClientSecret: "<YourClientSecret>"
-            UsePkce: true
-          Scopes: ["openid", "profile", "email"]
+          provider:
+            url: "https://login.my-keycloak.com/realms/<myRealm>"
+            clientId: "<YourClientId>"
+            clientSecret: "<YourClientSecret>"
+            usePkce: true
+          scopes: ["openid", "profile", "email"]
 ```

@@ -33,10 +33,10 @@ http:
     oidc-auth:
       plugin:
         traefik-oidc-auth:
-          Provider:
-            Url: "https://login.my-logto.com/oidc"
-            ClientId: "<YourAppId>"
-            ClientSecret: "<YourClientSecret>"
-            UsePkce: true
-          Scopes: ["openid", "profile", "email"]
+          provider:
+            url: "https://login.my-logto.com/oidc"
+            clientId: "<YourAppId>"
+            clientSecret: "<YourClientSecret>"
+            usePkce: true
+          scopes: ["openid", "profile", "email"]
 ```
