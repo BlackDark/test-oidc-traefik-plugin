@@ -6,6 +6,15 @@ sidebar_position: 3
 
 ## Plugin Config Block
 
+:::warning Upgrading from a single `UnauthorizedBehavior`
+Starting with this fork's `v0.20.0`, the single `UnauthorizedBehavior` option that previously controlled the response for both unauthenticated requests (no/invalid session, HTTP 401) and unauthorized requests (valid session, but failing the `Authorization` rules, HTTP 403) has been split into two separate options:
+
+- `UnauthenticatedBehavior` now controls the 401 case.
+- `UnauthorizedBehavior` now controls only the 403 case.
+
+If you're upgrading from a pre-split config (legacy single `UnauthorizedBehavior`), move your existing value as-is to `UnauthenticatedBehavior` to keep the same unauthenticated behavior. No change is needed for the 403 case unless you want to opt into `Challenge` there (e.g. step-up authentication; see [`AuthorizationParams`](#plugin-config-block) and [Authorization](./authorization.md)). Legacy configs that only set `UnauthorizedBehavior` are also migrated automatically at startup.
+:::
+
 :::caution
 It is highly recommended to change the default encryption-secret by providing your own 32-character secret using the `Secret`-option.
 You can generate a random one here: https://it-tools.tech/token-generator?length=32
