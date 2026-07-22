@@ -64,7 +64,7 @@ sequenceDiagram
 
 ## Logout {#logout}
 
-If you want to log out and remove the session it is simply enough to navigate to the `/logout` route or whatever you've configured for `LogoutUri` in the [Plugin Config Block](./middleware-configuration.md#plugin-config-block).
+If you want to log out and remove the session it is simply enough to navigate to the `/logout` route or whatever you've configured for `logoutUri` in the [Plugin Config Block](./middleware-configuration.md#plugin-config-block).
 This can be achieved by a simple link for example:
 
 ```html
@@ -85,11 +85,11 @@ sequenceDiagram
     OAuth->>User: Redirect to Plugin Callback (/oidc/callback)
     User->>Traefik: Follow Plugin Callback (/oidc/callback)
     Traefik->>Traefik: Clear Session and Cookie
-    Traefik->>User: Redirect to `PostLogoutRedirectUri`
+    Traefik->>User: Redirect to `postLogoutRedirectUri`
 ```
 
 :::tip
-The configured `PostLogoutRedirectUri` is the default url to which the user will be redirected after the logout is completed.
+The configured `postLogoutRedirectUri` is the default url to which the user will be redirected after the logout is completed.
 You can also specify a different url when navigating to the `/logout` endpoint like this:  
 `/logout?redirect_uri=/whatever` or `/logout?post_logout_redirect_uri=/whatever`.  
 Both will do the same.

@@ -5,7 +5,7 @@ sidebar_position: 6
 # Bypass Authentication Rule
 
 When using the *traefik-oidc-auth* middleware, every request requires authentication by default.
-But you might want to forward some public paths to the upstream directly or skip authentication if you're accessing your service from an internal network etc. This is where the `BypassAuthenticationRule` comes in.
+But you might want to forward some public paths to the upstream directly or skip authentication if you're accessing your service from an internal network etc. This is where the `bypassAuthenticationRule` comes in.
 
 It lets you specify a rule, similar to traefik's `router`-rules. If a request matches this rule, it is forwarded to the upstream service without any authentication.
 
@@ -17,12 +17,12 @@ http:
     oidc-auth:
       plugin:
         traefik-oidc-auth:
-          Provider:
-            Url: "${PROVIDER_URL}"
-            ClientId: "${CLIENT_ID}"
-            ClientSecret: "${CLIENT_SECRET}"
+          provider:
+            url: "${PROVIDER_URL}"
+            clientId: "${CLIENT_ID}"
+            clientSecret: "${CLIENT_SECRET}"
           // highlight-next-line
-          BypassAuthenticationRule: "PathPrefix(`/public`) || HeaderRegexp(`X-Real-Ip`, `^172\\.18\\.`)"
+          bypassAuthenticationRule: "PathPrefix(`/public`) || HeaderRegexp(`X-Real-Ip`, `^172\\.18\\.`)"
 ```
 
 :::tip
@@ -45,6 +45,6 @@ The following rules are available:
 | <code>QueryRegexp(&#96;apikey&#96;, &#96;^[0-9]+$&#96;)</code> | Match the specified query parameter against the given regex. |
 
 :::note
-In order to forward headers to the upstream service when authentication is bypassed the `IncludeWhen` option of that header needs to be set to `Always` or `Public`. 
+In order to forward headers to the upstream service when authentication is bypassed the `includeWhen` option of that header needs to be set to `Always` or `Public`. 
 Otherwise the header will not be set, even if an existing session is present.
 :::

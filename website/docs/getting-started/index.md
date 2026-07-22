@@ -15,14 +15,14 @@ Enable the plugin in your traefik configuration.
 experimental:
   plugins:
     traefik-oidc-auth:
-      moduleName: "github.com/sevensolutions/traefik-oidc-auth"
+      moduleName: "github.com/BlackDark/test-oidc-traefik-plugin"
       version: "v0.20.1"
 ```
 
 ## Configure Middleware
 
 :::caution
-It is highly recommended to change the default encryption-secret by providing your own 32-character secret using the `Secret`-option.
+It is highly recommended to change the default encryption-secret by providing your own 32-character secret using the `secret`-option.
 You can generate a random one here: https://it-tools.tech/token-generator?length=32
 :::
 
@@ -44,13 +44,13 @@ http:
     oidc-auth:
       plugin:
         traefik-oidc-auth:
-          Secret: "MLFs4TT99kOOq8h3UAVRtYoCTDYXiRcZ" # Please change this secret for your setup
-          Provider:
-            Url: "https://<YourIdentityProviderUrl>"
-            ClientId: "<YourClientId>"
-            ClientSecret: "<YourClientSecret>"
-            #UsePkce: true # Or use PKCE if your Provider supports this
-          Scopes: ["openid", "profile", "email"]
+          secret: "MLFs4TT99kOOq8h3UAVRtYoCTDYXiRcZ" # Please change this secret for your setup
+          provider:
+            url: "https://<YourIdentityProviderUrl>"
+            clientId: "<YourClientId>"
+            clientSecret: "<YourClientSecret>"
+            #usePkce: true # Or use PKCE if your Provider supports this
+          scopes: ["openid", "profile", "email"]
     # highlight-end
 
   routers:
@@ -88,14 +88,14 @@ spec:
   # highlight-start
   plugin:
     traefik-oidc-auth: # same key as in the static configuration
-      Secret: "urn:k8s:secret:oidc-secret:pluginSecret"
-      Provider:
+      secret: "urn:k8s:secret:oidc-secret:pluginSecret"
+      provider:
         # You could just write strings here for the values.
-        ClientId: "abcd-12345"
+        clientId: "abcd-12345"
         # Or you can reference a Secret in the same namespace as the Middleware.
         # This will resolve to the value of the providerClientSecret key
         # in the secret named oidc-secret.
-        ClientSecret: "urn:k8s:secret:oidc-secret:providerClientSecret"
+        clientSecret: "urn:k8s:secret:oidc-secret:providerClientSecret"
   # highlight-end
 ---
 apiVersion: traefik.io/v1alpha1

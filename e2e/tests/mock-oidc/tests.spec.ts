@@ -9,13 +9,13 @@ const PLUGIN_SECRET = '0123456789abcdef0123456789abcdef';
 function baseMiddleware(extra = ''): string {
   return `
         traefik-oidc-auth:
-          LogLevel: DEBUG
-          Secret: "${PLUGIN_SECRET}"
-          Provider:
-            Url: "\${PROVIDER_URL}"
-            ClientId: "\${CLIENT_ID}"
-            ClientSecret: "\${CLIENT_SECRET}"
-            UsePkce: false
+          logLevel: DEBUG
+          secret: "${PLUGIN_SECRET}"
+          provider:
+            url: "\${PROVIDER_URL}"
+            clientId: "\${CLIENT_ID}"
+            clientSecret: "\${CLIENT_SECRET}"
+            usePkce: false
 ${extra}`;
 }
 
@@ -142,11 +142,11 @@ ${whoamiService()}
     oidc-auth:
       plugin:
 ${baseMiddleware(`
-          Headers:
-            - Name: "Authorization"
-              Value: "{{\`Bearer: {{ .accessToken }}\`}}"
-            - Name: "X-Static-Header"
-              Value: "42"
+          headers:
+            - name: "Authorization"
+              value: "{{\`Bearer: {{ .accessToken }}\`}}"
+            - name: "X-Static-Header"
+              value: "42"
 `)}
 
 ${whoamiRouter()}
@@ -172,10 +172,10 @@ ${whoamiService()}
     oidc-auth:
       plugin:
 ${baseMiddleware(`
-          Authorization:
-            AssertClaims:
-              - Name: email
-                AnyOf: ["admin", "alice@example.com"]
+          authorization:
+            assertClaims:
+              - name: email
+                anyOf: ["admin", "alice@example.com"]
 `)}
 
 ${whoamiRouter()}
@@ -195,10 +195,10 @@ ${whoamiService()}
     oidc-auth:
       plugin:
 ${baseMiddleware(`
-          Authorization:
-            AssertClaims:
-              - Name: email
-                AnyOf: ["admin", "alice@example.com"]
+          authorization:
+            assertClaims:
+              - name: email
+                anyOf: ["admin", "alice@example.com"]
 `)}
 
 ${whoamiRouter()}
@@ -227,8 +227,8 @@ ${whoamiService()}
     oidc-auth:
       plugin:
 ${baseMiddleware(`
-          LoginUri: "/login"
-          BypassAuthenticationRule: "Header(\`MY-HEADER\`, \`123\`)"
+          loginUri: "/login"
+          bypassAuthenticationRule: "Header(\`MY-HEADER\`, \`123\`)"
 `)}
 
 ${whoamiRouter()}
@@ -257,13 +257,13 @@ ${whoamiService()}
     oidc-auth:
       plugin:
 ${baseMiddleware(`
-          BypassAuthenticationRule: "Path(\`/test1\`)"
-          UnauthorizedBehavior: Forward
-          LoginUri: "/login"
-          Headers:
-            - Name: "Authorization"
-              Value: "{{\`Bearer: {{ .accessToken }}\`}}"
-              IncludeWhen: "Public"
+          bypassAuthenticationRule: "Path(\`/test1\`)"
+          unauthorizedBehavior: Forward
+          loginUri: "/login"
+          headers:
+            - name: "Authorization"
+              value: "{{\`Bearer: {{ .accessToken }}\`}}"
+              includeWhen: "Public"
 `)}
 
 ${whoamiRouter()}
@@ -287,11 +287,11 @@ ${whoamiService()}
     oidc-auth:
       plugin:
 ${baseMiddleware(`
-          AuthorizationHeader:
-            Name: "CustomAuth"
-          AuthorizationCookie:
-            Name: "CustomAuth"
-          UnauthorizedBehavior: "Unauthorized"
+          authorizationHeader:
+            name: "CustomAuth"
+          authorizationCookie:
+            name: "CustomAuth"
+          unauthorizedBehavior: "Unauthorized"
 `)}
 
 ${whoamiRouter()}
@@ -342,13 +342,13 @@ ${whoamiService()}
     oidc-auth:
       plugin:
 ${baseMiddleware(`
-          AuthorizationHeader:
-            Name: "CustomAuth"
-          UnauthorizedBehavior: "Unauthorized"
-          Authorization:
-            AssertClaims:
-              - Name: email
-                AnyOf: ["admin", "alice@example.com"]
+          authorizationHeader:
+            name: "CustomAuth"
+          unauthorizedBehavior: "Unauthorized"
+          authorization:
+            assertClaims:
+              - name: email
+                anyOf: ["admin", "alice@example.com"]
 `)}
 
 ${whoamiRouter()}
@@ -388,13 +388,13 @@ ${whoamiService()}
     oidc-auth:
       plugin:
 ${baseMiddleware(`
-          Authorization:
-            AssertClaims:
-              - Name: email
-                AnyOf: ["admin", "alice@example.com"]
-          ErrorPages:
-            Unauthorized:
-              FilePath: "/data/customUnauthorizedPage.html"
+          authorization:
+            assertClaims:
+              - name: email
+                anyOf: ["admin", "alice@example.com"]
+          errorPages:
+            unauthorized:
+              filePath: "/data/customUnauthorizedPage.html"
 `)}
 
 ${whoamiRouter()}
@@ -421,13 +421,13 @@ ${whoamiService()}
     oidc-auth:
       plugin:
 ${baseMiddleware(`
-          Authorization:
-            AssertClaims:
-              - Name: email
-                AnyOf: ["admin", "alice@example.com"]
-          ErrorPages:
-            Unauthorized:
-              RedirectTo: "http://localhost:9080/unauthorized"
+          authorization:
+            assertClaims:
+              - name: email
+                anyOf: ["admin", "alice@example.com"]
+          errorPages:
+            unauthorized:
+              redirectTo: "http://localhost:9080/unauthorized"
 `)}
 
 ${whoamiRouter()}
@@ -457,29 +457,29 @@ ${whoamiService()}
     auth:
       plugin:
 ${baseMiddleware(`
-          Authorization:
-            AssertClaims:
-              - Name: email
-                AnyOf: ["bob@example.com", "alice@example.com"]
-            CheckOnEveryRequest: true
+          authorization:
+            assertClaims:
+              - name: email
+                anyOf: ["bob@example.com", "alice@example.com"]
+            checkOnEveryRequest: true
 `)}
     auth-bob:
       plugin:
 ${baseMiddleware(`
-          Authorization:
-            AssertClaims:
-              - Name: email
-                AnyOf: ["bob@example.com"]
-            CheckOnEveryRequest: true
+          authorization:
+            assertClaims:
+              - name: email
+                anyOf: ["bob@example.com"]
+            checkOnEveryRequest: true
 `)}
     auth-alice:
       plugin:
 ${baseMiddleware(`
-          Authorization:
-            AssertClaims:
-              - Name: email
-                AnyOf: ["alice@example.com"]
-            CheckOnEveryRequest: true
+          authorization:
+            assertClaims:
+              - name: email
+                anyOf: ["alice@example.com"]
+            checkOnEveryRequest: true
 `)}
 
   routers:
@@ -527,31 +527,31 @@ ${whoamiService()}
     auth:
       plugin:
 ${baseMiddleware(`
-          Authorization:
-            AssertClaims:
-              - Name: email
-                AnyOf: ["bob@example.com", "alice@example.com"]
-            CheckOnEveryRequest: true
+          authorization:
+            assertClaims:
+              - name: email
+                anyOf: ["bob@example.com", "alice@example.com"]
+            checkOnEveryRequest: true
 `)}
     auth-bob:
       plugin:
 ${baseMiddleware(`
-          UnauthenticatedBehavior: Auto
-          UnauthorizedBehavior: Challenge
-          Authorization:
-            AssertClaims:
-              - Name: email
-                AnyOf: ["bob@example.com"]
-            CheckOnEveryRequest: true
+          unauthenticatedBehavior: Auto
+          unauthorizedBehavior: Challenge
+          authorization:
+            assertClaims:
+              - name: email
+                anyOf: ["bob@example.com"]
+            checkOnEveryRequest: true
 `)}
     auth-alice:
       plugin:
 ${baseMiddleware(`
-          Authorization:
-            AssertClaims:
-              - Name: email
-                AnyOf: ["alice@example.com"]
-            CheckOnEveryRequest: true
+          authorization:
+            assertClaims:
+              - name: email
+                anyOf: ["alice@example.com"]
+            checkOnEveryRequest: true
 `)}
 
   routers:

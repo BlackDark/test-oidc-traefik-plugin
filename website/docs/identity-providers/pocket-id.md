@@ -23,11 +23,11 @@ http:
     oidc-auth:
       plugin:
         traefik-oidc-auth:
-          Provider:
-            Url: "https://pocket-id.mydomain.com/"
-            ClientId: "<YourClientId>"
-            ClientSecret: "<YourClientSecret>"
-          Scopes: ["openid", "profile", "email"]  # "groups" also supported
+          provider:
+            url: "https://pocket-id.mydomain.com/"
+            clientId: "<YourClientId>"
+            clientSecret: "<YourClientSecret>"
+          scopes: ["openid", "profile", "email"]  # "groups" also supported
 ```
 
 ### With groups authorization
@@ -38,13 +38,13 @@ http:
     oidc-auth:
       plugin:
         traefik-oidc-auth:
-          Provider:
-            Url: "https://pocket-id.mydomain.com/"
-            ClientId: "<YourClientId>"
-            ClientSecret: "<YourClientSecret>"
-          Scopes: ["openid", "profile", "email", "groups"]
-          Authorization:
-            AssertClaims:
-              - Name: groups
-                AnyOf: ["name_of_the_group_you_want_to_authorize"]
+          provider:
+            url: "https://pocket-id.mydomain.com/"
+            clientId: "<YourClientId>"
+            clientSecret: "<YourClientSecret>"
+          scopes: ["openid", "profile", "email", "groups"]
+          authorization:
+            assertClaims:
+              - name: groups
+                anyOf: ["name_of_the_group_you_want_to_authorize"]
 ```

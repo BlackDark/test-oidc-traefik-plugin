@@ -6,7 +6,7 @@ sidebar_position: 99
 
 ## How can i get more log output from the plugin
 
-The default log level of the plugin is set to `WARN`. You can change this by specifying the `LogLevel` option in the [configuration](./middleware-configuration.md).
+The default log level of the plugin is set to `WARN`. You can change this by specifying the `logLevel` option in the [configuration](./middleware-configuration.md).
 
 ## I get stuck in a redirect loop after signing in
 
@@ -19,4 +19,4 @@ If you really can't use HTTPS you can set `SessionCookie.Secure` to `false`, but
 
 This normally means, that your user isn't authorized to sign in. Please check the traefik logs to get more information.
 You may see something like `Unauthorized. Unable to find claim roles in token claims.`. It will also output all the claims contained in the token.
-Please adjust your `Authorization`-config accordingly.
+Please adjust your `authorization`-config accordingly.

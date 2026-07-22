@@ -11,7 +11,7 @@ As soon as a user is authenticated it is allowed to use the application, secured
 But you may have multiple applications and you may want to specify a more granular definition of who is allowed to access which application.
 This can be achieved using the plugin's `ClaimAssertion`s.
 
-When a user is authenticated, an `access_token` and an `id_token` is returned by the identity provider, a *session* is created and these tokens are stored within that session. By default the `access_token` is used but you can use the other one by setting [`TokenValidation`](./middleware-configuration.md#provider) to `IdToken`.
+When a user is authenticated, an `access_token` and an `id_token` is returned by the identity provider, a *session* is created and these tokens are stored within that session. By default the `access_token` is used but you can use the other one by setting [`tokenValidation`](./middleware-configuration.md#provider) to `IdToken`.
 
 Both tokens are [*Json Web Tokens (JWT)*](https://jwt.io/) which can be decoded and made human-readable using [online tools](https://jwt.io/).
 When being decoded they're represented as a JSON-object where every property is called a *Claim*.
@@ -73,26 +73,26 @@ You can also check out the [Identity Providers section](../identity-providers/in
 
 ## How it works
 
-Every authorization rule is expressed by a claim-assertion using the `AssertClaims`-property.
-These rules need to contain a name-selector and an optional `AllOf` or `AnyOf` quantifier.
+Every authorization rule is expressed by a claim-assertion using the `assertClaims`-property.
+These rules need to contain a name-selector and an optional `allOf` or `anyOf` quantifier.
 If only the name is set without a quantifier, the rule only checks for presence of the claim without further validating it's value.
-It is also possible to combine the `AnyOf` and `AllOf` quantifiers in one assertion.
+It is also possible to combine the `anyOf` and `allOf` quantifiers in one assertion.
 
 :::important
 Because the name is being interpreted as [json path](https://jsonpath.com/), you may need to escape some names, if they contain special characters like a colon or minus.
-So instead of `Name: "my:zitadel:grants"`, use `Name: "['my:zitadel:grants']"`.
+So instead of `name: "my:zitadel:grants"`, use `name: "['my:zitadel:grants']"`.
 :::
 
 :::tip
-If the user is not authorized, all claims, contained in the token, are printed in the console if the [`LogLevel`](./middleware-configuration.md) is set to `DEBUG`. This may help you to know which claims exist in your token.
+If the user is not authorized, all claims, contained in the token, are printed in the console if the [`logLevel`](./middleware-configuration.md) is set to `DEBUG`. This may help you to know which claims exist in your token.
 :::
 
 ### When is authorization checked?
 
-By default, `AssertClaims` is only evaluated **once**, when the user logs in and the session is created. For every subsequent request on that session, the previously computed result is simply reused - it is *not* re-evaluated, even if the underlying claims would now produce a different result (e.g. after a silent token refresh). Set [`CheckOnEveryRequest`](./middleware-configuration.md#authorization) to `true` if you need the assertion to be re-evaluated on every request - for example when you're checking an `acr`/`amr` claim to enforce step-up authentication for specific routes, or when the required claims could change without the user going through a full login again. When using [`AuthorizationHeader`](./middleware-configuration.md#authorization-header) or [`AuthorizationCookie`](./middleware-configuration.md#authorization-cookie), this is always treated as `true`, since there is no persistent session to cache the result in.
+By default, `assertClaims` is only evaluated **once**, when the user logs in and the session is created. For every subsequent request on that session, the previously computed result is simply reused - it is *not* re-evaluated, even if the underlying claims would now produce a different result (e.g. after a silent token refresh). Set [`checkOnEveryRequest`](./middleware-configuration.md#authorization) to `true` if you need the assertion to be re-evaluated on every request - for example when you're checking an `acr`/`amr` claim to enforce step-up authentication for specific routes, or when the required claims could change without the user going through a full login again. When using [`authorizationHeader`](./middleware-configuration.md#authorization-header) or [`authorizationCookie`](./middleware-configuration.md#authorization-cookie), this is always treated as `true`, since there is no persistent session to cache the result in.
 
 :::important
-If the initial check at login fails, that *unauthorized* result is cached in the session, unless `CheckOnEveryRequest` is enabled. While the cached result is in effect, and depending on [`UnauthorizedBehavior`](./middleware-configuration.md#plugin-config-block), every following request to a protected route will either get a 403 again, or - with `Challenge` explicitly configured - redirect through the IDP **once** on the first HTML request (the session is then marked `ChallengeAttempted`); later requests on that same session return 403 with no further IdP round trip, until the session is replaced by a new one that actually passes the check. With `CheckOnEveryRequest` enabled the result isn't cached but re-evaluated on every request, so the same session can start passing without re-login once its (e.g. refreshed) claims satisfy the rules.
+If the initial check at login fails, that *unauthorized* result is cached in the session, unless `checkOnEveryRequest` is enabled. While the cached result is in effect, and depending on [`unauthorizedBehavior`](./middleware-configuration.md#plugin-config-block), every following request to a protected route will either get a 403 again, or - with `Challenge` explicitly configured - redirect through the IDP **once** on the first HTML request (the session is then marked `ChallengeAttempted`); later requests on that same session return 403 with no further IdP round trip, until the session is replaced by a new one that actually passes the check. With `checkOnEveryRequest` enabled the result isn't cached but re-evaluated on every request, so the same session can start passing without re-login once its (e.g. refreshed) claims satisfy the rules.
 :::
 
 Here is a commonly used example configuration on how to only allow *admin* or *media* users, based on the `roles` claim.  
@@ -108,16 +108,16 @@ http:
     oidc-auth:
       plugin:
         traefik-oidc-auth:
-          Provider:
-            Url: "https://your-idp.com"
-            ClientId: "<YourClientId>"
-            UsePkce: true
-          Scopes: ["openid", "profile", "email"]
+          provider:
+            url: "https://your-idp.com"
+            clientId: "<YourClientId>"
+            usePkce: true
+          scopes: ["openid", "profile", "email"]
           # highlight-start
-          Authorization:
-            AssertClaims:
-              - Name: roles
-                AnyOf: ["admin", "media"]
+          authorization:
+            assertClaims:
+              - name: roles
+                anyOf: ["admin", "media"]
           # highlight-end
 ```
 
@@ -217,26 +217,26 @@ Here are some more complex examples based on the following json structure. This 
 
   **Example**: Expect array to contain a set of values
   ```yaml
-  Name: store.book[*].price
-  AllOf: [ 22.99, 8.99 ]
+  name: store.book[*].price
+  allOf: [ 22.99, 8.99 ]
   ```
-  This assertion would succeed as the `book` array contains all values specified by the `AllOf` quantifier
+  This assertion would succeed as the `book` array contains all values specified by the `allOf` quantifier
   ```yaml
-  Name: store.book[*].price
-  AllOf: [ 22.99, 8.99, 1 ]
+  name: store.book[*].price
+  allOf: [ 22.99, 8.99, 1 ]
   ```
   This assertion would fail as the `book` array contains no entry for which the `price` is `1`
 
   **Example**: Expect object key to be any value of a set of values
   ```yaml
-  Name: store.bicycle.color
-  AnyOf: [ "red", "blue", "green" ]
+  name: store.bicycle.color
+  anyOf: [ "red", "blue", "green" ]
   ```
   This assertion would succeed as the `store` object contains a `bicycle` object whose `color` is `red`
 
 ## Custom Error Page
 
-If a user is authenticated but unauthorized, the response depends on the [`UnauthorizedBehavior`](./middleware-configuration.md#plugin-config-block) setting. By default (`Unauthorized`), a default error page is shown and a status code 403 - Forbidden is returned. If `UnauthorizedBehavior` is explicitly set to `Challenge`, HTML requests are first redirected back to the IDP once (e.g. to allow the user to switch accounts or satisfy a step-up authentication requirement); if the user is still unauthorized afterwards, or for non-HTML requests, the same 403 error page is shown instead.
+If a user is authenticated but unauthorized, the response depends on the [`unauthorizedBehavior`](./middleware-configuration.md#plugin-config-block) setting. By default (`Unauthorized`), a default error page is shown and a status code 403 - Forbidden is returned. If `unauthorizedBehavior` is explicitly set to `Challenge`, HTML requests are first redirected back to the IDP once (e.g. to allow the user to switch accounts or satisfy a step-up authentication requirement); if the user is still unauthorized afterwards, or for non-HTML requests, the same 403 error page is shown instead.
 You can customize this page by providing your own HTML-file as shown below:
 
 ```yml
@@ -245,15 +245,15 @@ http:
     oidc-auth:
       plugin:
         traefik-oidc-auth:
-          Provider:
-            Url: "https://your-idp.com"
-            ClientId: "<YourClientId>"
-            UsePkce: true
-          Scopes: ["openid", "profile", "email"]
+          provider:
+            url: "https://your-idp.com"
+            clientId: "<YourClientId>"
+            usePkce: true
+          scopes: ["openid", "profile", "email"]
           # highlight-start
-          ErrorPages:
-            Unauthorized:
-              FilePath: "/opt/traefik/error-pages/unauthorized.html"
+          errorPages:
+            unauthorized:
+              filePath: "/opt/traefik/error-pages/unauthorized.html"
           # highlight-end
 ```
 

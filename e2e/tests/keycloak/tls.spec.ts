@@ -24,13 +24,13 @@ http:
     oidc-auth:
       plugin:
         traefik-oidc-auth:
-          LogLevel: DEBUG
-          Secret: "0123456789abcdef0123456789abcdef"
-          Provider:
-            Url: "\${PROVIDER_URL_HTTP}"
-            ClientId: "\${CLIENT_ID}"
-            ClientSecret: "\${CLIENT_SECRET}"
-            UsePkce: false
+          logLevel: DEBUG
+          secret: "0123456789abcdef0123456789abcdef"
+          provider:
+            url: "\${PROVIDER_URL_HTTP}"
+            clientId: "\${CLIENT_ID}"
+            clientSecret: "\${CLIENT_SECRET}"
+            usePkce: false
 
   routers:
     whoami:
@@ -82,14 +82,14 @@ http:
     oidc-auth:
       plugin:
         traefik-oidc-auth:
-          LogLevel: DEBUG
-          Secret: "0123456789abcdef0123456789abcdef"
-          Provider:
-            Url: "\${PROVIDER_URL_HTTPS}"
-            CABundleFile: "/certificates/bundle/ca_bundle.pem"
-            ClientId: "\${CLIENT_ID}"
-            ClientSecret: "\${CLIENT_SECRET}"
-            UsePkce: false
+          logLevel: DEBUG
+          secret: "0123456789abcdef0123456789abcdef"
+          provider:
+            url: "\${PROVIDER_URL_HTTPS}"
+            cABundleFile: "/certificates/bundle/ca_bundle.pem"
+            clientId: "\${CLIENT_ID}"
+            clientSecret: "\${CLIENT_SECRET}"
+            usePkce: false
 
   routers:
     whoami:
@@ -126,14 +126,14 @@ http:
     oidc-auth:
       plugin:
         traefik-oidc-auth:
-          LogLevel: DEBUG
-          Secret: "0123456789abcdef0123456789abcdef"
-          Provider:
-            Url: "\${PROVIDER_URL_HTTPS}"
-            CABundle: "base64:${base64CertBundle}"
-            ClientId: "\${CLIENT_ID}"
-            ClientSecret: "\${CLIENT_SECRET}"
-            UsePkce: false
+          logLevel: DEBUG
+          secret: "0123456789abcdef0123456789abcdef"
+          provider:
+            url: "\${PROVIDER_URL_HTTPS}"
+            cABundle: "base64:${base64CertBundle}"
+            clientId: "\${CLIENT_ID}"
+            clientSecret: "\${CLIENT_SECRET}"
+            usePkce: false
 
   routers:
     whoami:

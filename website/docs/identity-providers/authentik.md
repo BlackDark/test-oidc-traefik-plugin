@@ -28,9 +28,9 @@ http:
     oidc-auth:
       plugin:
         traefik-oidc-auth:
-          Provider:
-            Url: "https://login.my-authentik.com/application/o/<app-slug>"
-            ClientId: "<YourClientId>"
-            ClientSecret: "<YourClientSecret>"
-          Scopes: ["openid", "profile", "email"]
+          provider:
+            url: "https://login.my-authentik.com/application/o/<app-slug>"
+            clientId: "<YourClientId>"
+            clientSecret: "<YourClientSecret>"
+          scopes: ["openid", "profile", "email"]
 ```

@@ -13,13 +13,13 @@ http:
     oidc-auth:
       plugin:
         traefik-oidc-auth:
-          LogLevel: DEBUG
-          Secret: "MLFs4TT99kOOq8h3UAVRtYoCTDYXiRcZ" # Please change this secret for your setup
-          Provider:
-            Url: "${PROVIDER_URL}"
-            ClientId: "${CLIENT_ID}"
-            ClientSecret: "${CLIENT_SECRET}"
-            UsePkce: true
+          logLevel: DEBUG
+          secret: "MLFs4TT99kOOq8h3UAVRtYoCTDYXiRcZ" # Please change this secret for your setup
+          provider:
+            url: "${PROVIDER_URL}"
+            clientId: "${CLIENT_ID}"
+            clientSecret: "${CLIENT_SECRET}"
+            usePkce: true
   
   routers:
     dashboard:

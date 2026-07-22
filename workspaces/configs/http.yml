@@ -9,42 +9,42 @@ http:
     oidc-auth:
       plugin:
         traefik-oidc-auth:
-          LogLevel: DEBUG
-          Secret: "0123456789abcdef0123456789abcdef" # Please change this secret for your setup
-          Provider:
-            Url: "${PROVIDER_URL}"
-            ClientId: "${CLIENT_ID}"
-            ClientSecret: "${CLIENT_SECRET}"
-            UsePkce: true
-            ValidateAudience: "${VALIDATE_AUDIENCE}"
-          Scopes: ["openid", "profile", "email"]
-          Headers:
-            - Name: "X-Oidc-Username"
-              Value: "{{`{{ .claims.preferred_username }}`}}"
-            - Name: "X-Oidc-Subject"
-              Value: "sub"
-            - Name: "Authorization"
-              Value: "{{`Bearer {{ .accessToken }}`}}"
+          logLevel: DEBUG
+          secret: "0123456789abcdef0123456789abcdef" # Please change this secret for your setup
+          provider:
+            url: "${PROVIDER_URL}"
+            clientId: "${CLIENT_ID}"
+            clientSecret: "${CLIENT_SECRET}"
+            usePkce: true
+            validateAudience: "${VALIDATE_AUDIENCE}"
+          scopes: ["openid", "profile", "email"]
+          headers:
+            - name: "X-Oidc-Username"
+              value: "{{`{{ .claims.preferred_username }}`}}"
+            - name: "X-Oidc-Subject"
+              value: "sub"
+            - name: "Authorization"
+              value: "{{`Bearer {{ .accessToken }}`}}"
               # IncludeWhen: "Public"
-            - Name: "IdToken"
-              Value: "{{`Bearer {{ .idToken }}`}}"
-          AuthorizationHeader:
-            Name: "CustomAuth"
-          AuthorizationCookie:
-            Name: "CustomAuth"
-          #BypassAuthenticationRule: "Header(`cache-control`, `no-cache`) || HeaderRegexp(`X-Real-Ip`, `^172\\.18\\.`)"
-          #UnauthorizedBehavior: "Unauthorized"
-          #AuthorizationParams:
+            - name: "IdToken"
+              value: "{{`Bearer {{ .idToken }}`}}"
+          authorizationHeader:
+            name: "CustomAuth"
+          authorizationCookie:
+            name: "CustomAuth"
+          #bypassAuthenticationRule: "Header(`cache-control`, `no-cache`) || HeaderRegexp(`X-Real-Ip`, `^172\\.18\\.`)"
+          #unauthorizedBehavior: "Unauthorized"
+          #authorizationParams:
           #  acr_values: "aal2"
           #  prompt: "login"
-          # Authorization:
-          #   AssertClaims:
+          # authorization:
+          #   assertClaims:
           #     - Name: roles
-          #       AnyOf: ["admin", "media"]
+          #       anyOf: ["admin", "media"]
           #     - Name: some.nested.key
-          #       AnyOf: ["some value"]
+          #       anyOf: ["some value"]
           # If set, only the /login endpoint will initiate the login flow
-          LoginUri: "/login"
+          loginUri: "/login"
           #ValidPostLoginRedirectUris: ["https://google.at"]
           #ValidPostLogoutRedirectUris: ["https://google.at"]
           #PostLoginRedirectUri: "/"

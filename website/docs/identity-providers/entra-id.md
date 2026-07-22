@@ -33,9 +33,9 @@ http:
     oidc-auth:
       plugin:
         traefik-oidc-auth:
-          Provider:
-            Url: "https://login.microsoftonline.com/<YourTenantId>/v2.0"
-            ClientId: "<YourClientId>"
-            ClientSecret: "<YourClientSecret>"
-          Scopes: ["openid", "profile", "email"]
+          provider:
+            url: "https://login.microsoftonline.com/<YourTenantId>/v2.0"
+            clientId: "<YourClientId>"
+            clientSecret: "<YourClientSecret>"
+          scopes: ["openid", "profile", "email"]
 ```
