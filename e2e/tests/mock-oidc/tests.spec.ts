@@ -518,6 +518,85 @@ ${baseMiddleware(`
     .toBe(403);
 });
 
+test('test UnauthorizedBehavior Challenge does not cause a redirect loop', async ({ page }) => {
+  await configureTraefik(`
+http:
+${whoamiService()}
+
+  middlewares:
+    auth:
+      plugin:
+${baseMiddleware(`
+          Authorization:
+            AssertClaims:
+              - Name: email
+                AnyOf: ["bob@example.com", "alice@example.com"]
+            CheckOnEveryRequest: true
+`)}
+    auth-bob:
+      plugin:
+${baseMiddleware(`
+          UnauthenticatedBehavior: Auto
+          UnauthorizedBehavior: Challenge
+          Authorization:
+            AssertClaims:
+              - Name: email
+                AnyOf: ["bob@example.com"]
+            CheckOnEveryRequest: true
+`)}
+    auth-alice:
+      plugin:
+${baseMiddleware(`
+          Authorization:
+            AssertClaims:
+              - Name: email
+                AnyOf: ["alice@example.com"]
+            CheckOnEveryRequest: true
+`)}
+
+  routers:
+    oidc-callback:
+      entryPoints: ["web"]
+      rule: "PathPrefix(\`/oidc/callback\`)"
+      service: noop@internal
+      middlewares: ["auth"]
+    whoami-bob:
+      entryPoints: ["web"]
+      rule: "PathPrefix(\`/bob\`)"
+      service: whoami
+      middlewares: ["auth-bob"]
+    whoami-alice:
+      entryPoints: ["web"]
+      rule: "PathPrefix(\`/alice\`)"
+      middlewares: ["auth-alice"]
+      service: whoami
+`);
+
+  await expectGotoOkay(page, 'http://localhost:9080/alice');
+  const response = await login(
+    page,
+    'alice@example.com',
+    'alice123',
+    'http://localhost:9080/alice',
+  );
+  expect(response.status()).toBe(200);
+  await expectGotoOkay(page, 'http://localhost:9080/alice');
+
+  // auth-bob Challenge: bounces alice through IdP once via shared permissive callback.
+  // Without ChallengeAttempted this loops (ERR_TOO_MANY_REDIRECTS); with it → 403.
+  // Mock IdP always shows the login form (no silent SSO), so complete one interactive challenge.
+  await page.goto('http://localhost:9080/bob');
+  await expect(page.locator('#username')).toBeVisible({ timeout: 10_000 });
+  const challenged = await login(
+    page,
+    'alice@example.com',
+    'alice123',
+    /http:\/\/localhost:9080\/bob/,
+    [403],
+  );
+  expect(challenged.status()).toBe(403);
+});
+
 async function login(
   page: Page,
   username: string,
