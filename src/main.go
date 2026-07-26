@@ -28,18 +28,19 @@ import (
 )
 
 type TraefikOidcAuth struct {
-	logger                   *logging.Logger
-	next                     http.Handler
-	httpClient               *http.Client
-	ProviderURL              *url.URL
-	ClientJwtPrivateKey      *rsa.PrivateKey
-	CallbackURL              *url.URL
-	Config                   *config.Config
-	SessionStorage           session.SessionStorage
-	DiscoveryDocument        *oidc.OidcDiscovery
-	Jwks                     *oidc.JwksHandler
-	Lock                     sync.RWMutex
-	BypassAuthenticationRule *rules.RequestCondition
+	logger                      *logging.Logger
+	next                        http.Handler
+	httpClient                  *http.Client
+	ProviderURL                 *url.URL
+	ClientJwtPrivateKey         *rsa.PrivateKey
+	CallbackURL                 *url.URL
+	Config                      *config.Config
+	SessionStorage              session.SessionStorage
+	DiscoveryDocument           *oidc.OidcDiscovery
+	Jwks                        *oidc.JwksHandler
+	Lock                        sync.RWMutex
+	BypassAuthenticationRule    *rules.RequestCondition
+	RedirectUriWildcardsEnabled bool
 }
 
 // Make sure we fetch oidc discovery document during first request - avoid race condition
@@ -453,10 +454,9 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 		}
 
 		if redirectUrl != "" {
-			redirectUrl = utils.EnsureAbsoluteUrl(req, redirectUrl)
 			// Only enforce allowlist when configured (same as /login?redirect_uri=...).
 			if len(toa.Config.ValidPostLoginRedirectUris) > 0 {
-				validated, err := utils.ValidateRedirectUri(redirectUrl, toa.Config.ValidPostLoginRedirectUris)
+				validated, err := utils.ValidateRedirectUri(redirectUrl, toa.Config.ValidPostLoginRedirectUris, toa.RedirectUriWildcardsEnabled)
 				if err != nil {
 					toa.logger.Log(logging.LevelWarn, "Post-login redirect rejected: %s", err.Error())
 					http.Error(rw, "Invalid redirect", http.StatusBadRequest)
@@ -464,6 +464,7 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 				}
 				redirectUrl = validated
 			}
+			redirectUrl = utils.EnsureAbsoluteUrl(req, redirectUrl)
 		} else {
 			redirectUrl = utils.EnsureAbsoluteUrl(req, toa.Config.PostLoginRedirectUri)
 		}
@@ -509,7 +510,7 @@ func (toa *TraefikOidcAuth) handleLogout(rw http.ResponseWriter, req *http.Reque
 	}
 
 	if redirectUriFromQuery != "" {
-		redirectUriFromQuery, err = utils.ValidateRedirectUri(redirectUriFromQuery, toa.Config.ValidPostLogoutRedirectUris)
+		redirectUriFromQuery, err = utils.ValidateRedirectUri(redirectUriFromQuery, toa.Config.ValidPostLogoutRedirectUris, toa.RedirectUriWildcardsEnabled)
 		if err != nil {
 			toa.logger.Log(logging.LevelError, "%s", err.Error())
 			http.Error(rw, err.Error(), http.StatusBadRequest)
@@ -709,7 +710,7 @@ func (toa *TraefikOidcAuth) handleLogin(rw http.ResponseWriter, req *http.Reques
 		redirectUrl = redirectUrlOverride
 	} else {
 		// If the user specified one on the /login request, use this one
-		redirectUriFromQuery, err := utils.ValidateRedirectUri(req.URL.Query().Get("redirect_uri"), toa.Config.ValidPostLoginRedirectUris)
+		redirectUriFromQuery, err := utils.ValidateRedirectUri(req.URL.Query().Get("redirect_uri"), toa.Config.ValidPostLoginRedirectUris, toa.RedirectUriWildcardsEnabled)
 		if err != nil {
 			toa.logger.Log(logging.LevelError, "%s", err.Error())
 			http.Error(rw, err.Error(), http.StatusBadRequest)

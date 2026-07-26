@@ -101,44 +101,83 @@ func TestValidateRedirectUri(t *testing.T) {
 		"https://something.com",
 	}
 
-	expectRedirectUriMatch(t, "https://example.com", validUris, true)
-	expectRedirectUriMatch(t, "https://malicious.com", validUris, false)
+	expectRedirectUriMatch(t, "https://example.com", validUris, false, true)
+	expectRedirectUriMatch(t, "https://malicious.com", validUris, false, false)
+	expectRedirectUriMatch(t, "https://example.com", validUris, true, true)
+	expectRedirectUriMatch(t, "https://EXAMPLE.com", validUris, true, false)
+}
+
+func TestValidateRedirectUriWildcardsRequireOptIn(t *testing.T) {
+	validUris := []string{
+		"*",
+		"https://*.example.com",
+		"/good/*",
+	}
+
+	expectRedirectUriMatch(t, "https://app.example.com", validUris, false, false)
+	expectRedirectUriMatch(t, "/good/index.html", validUris, false, false)
+	expectRedirectUriMatch(t, "*", validUris, false, true)
+
+	expectRedirectUriMatch(t, "https://app.example.com", validUris, true, true)
+	expectRedirectUriMatch(t, "/good/index.html", validUris, true, true)
 }
 
 func TestValidateRedirectUriWildcards(t *testing.T) {
 	validUris := []string{
-		"/",
-		"https://example.com",
-		"https://something.com",
-		"*",
-	}
-
-	expectRedirectUriMatch(t, "https://malicious.com", validUris, true)
-
-	validUris = []string{
 		"https://example.com",
 		"https://*.something.com",
 		"https://*.something.com/good",
 		"https://*.something.com/good/*",
+		"/app/*",
 	}
 
-	expectRedirectUriMatch(t, "https://app.something.com", validUris, true)
-	expectRedirectUriMatch(t, "https://app.sub.something.com", validUris, false)
-	expectRedirectUriMatch(t, "https://app.something.com/login", validUris, false)
-	expectRedirectUriMatch(t, "https://app.something.com/good", validUris, true)
-	expectRedirectUriMatch(t, "https://app.something.com/good/something", validUris, true)
-	expectRedirectUriMatch(t, "https://app.something.com/good/something/bad", validUris, false)
+	expectRedirectUriMatch(t, "https://app.something.com", validUris, true, true)
+	expectRedirectUriMatch(t, "https://app.sub.something.com", validUris, true, false)
+	expectRedirectUriMatch(t, "https://app.something.com/login", validUris, true, false)
+	expectRedirectUriMatch(t, "https://app.something.com/good", validUris, true, true)
+	expectRedirectUriMatch(t, "https://app.something.com/good/a/b", validUris, true, true)
+	expectRedirectUriMatch(t, "/app", validUris, true, true)
+	expectRedirectUriMatch(t, "/app/a/b?next=yes#route", validUris, true, true)
+	expectRedirectUriMatch(t, "https://app.something.com/good/a/b", validUris, false, false)
 }
 
-func expectRedirectUriMatch(t *testing.T, uri string, validUris []string, shouldMatch bool) {
-	matchedUri, err := ValidateRedirectUri(uri, validUris)
+func TestValidateRedirectUriWildcardsRejectUnsafeValues(t *testing.T) {
+	validUris := []string{"*", "https://*.example.com/*", "/good/*"}
+
+	unsafeUris := []string{
+		"//evil.example/good",
+		"https://good.example.com@evil.example/good",
+		"/good/../secret",
+		"/good/%2e%2e/secret",
+		"/good/%252e%252e%252fsecret",
+		"/good/%25252e%25252e%25252fsecret",
+		"/good/%2e%2e%5csecret",
+	}
+
+	for _, uri := range unsafeUris {
+		expectRedirectUriMatch(t, uri, validUris, true, false)
+	}
+}
+
+func TestValidateRedirectUriWildcardHostAndPortRules(t *testing.T) {
+	expectRedirectUriMatch(t, "https://app.example.com/path", []string{"https://*.example.com/*"}, true, true)
+	expectRedirectUriMatch(t, "https://app.sub.example.com/path", []string{"https://*.example.com/*"}, true, false)
+	expectRedirectUriMatch(t, "https://example.com.evil/path", []string{"https://example.com*"}, true, false)
+	expectRedirectUriMatch(t, "https://example.comevil/path", []string{"https://example.com*/*"}, true, false)
+	expectRedirectUriMatch(t, "https://example.com:8443/path", []string{"https://example.com:*/*"}, true, true)
+}
+
+func expectRedirectUriMatch(t *testing.T, uri string, validUris []string, wildcardsEnabled bool, shouldMatch bool) {
+	t.Helper()
+
+	matchedUri, err := ValidateRedirectUri(uri, validUris, wildcardsEnabled)
 
 	if (shouldMatch && err != nil) || (!shouldMatch && err == nil) {
-		t.Fail()
+		t.Fatalf("ValidateRedirectUri(%q, %v, %t) error = %v", uri, validUris, wildcardsEnabled, err)
 	}
 
 	if (shouldMatch && matchedUri != uri) || (!shouldMatch && matchedUri != "") {
-		t.Fail()
+		t.Fatalf("ValidateRedirectUri(%q, %v, %t) = %q", uri, validUris, wildcardsEnabled, matchedUri)
 	}
 }
 

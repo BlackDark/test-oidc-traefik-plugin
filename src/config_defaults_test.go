@@ -54,6 +54,39 @@ func TestCreateConfig_SecureDefaults(t *testing.T) {
 	}
 }
 
+func TestNew_RedirectURIWildcardsOptIn(t *testing.T) {
+	cfg := CreateConfig()
+	cfg.Provider.Url = "https://idp.example.com"
+	cfg.Provider.ClientId = "client"
+	cfg.Secret = "0123456789abcdef0123456789abcdef"
+	t.Setenv("TOA_ENABLE_REDIRECT_URI_WILDCARDS", "true")
+
+	middleware, err := New(context.Background(), nil, cfg, "test")
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	oidcMiddleware, ok := middleware.(*TraefikOidcAuth)
+	if !ok {
+		t.Fatalf("New() returned %T", middleware)
+	}
+	if !oidcMiddleware.RedirectUriWildcardsEnabled {
+		t.Fatal("RedirectUriWildcardsEnabled should be true")
+	}
+}
+
+func TestNew_RejectsInvalidRedirectURIWildcardFlag(t *testing.T) {
+	cfg := CreateConfig()
+	cfg.Provider.Url = "https://idp.example.com"
+	cfg.Provider.ClientId = "client"
+	cfg.Secret = "0123456789abcdef0123456789abcdef"
+	t.Setenv("TOA_ENABLE_REDIRECT_URI_WILDCARDS", "sometimes")
+
+	_, err := New(context.Background(), nil, cfg, "test")
+	if err == nil {
+		t.Fatal("expected invalid wildcard flag error")
+	}
+}
+
 func TestMigrateAuthBehaviors(t *testing.T) {
 	tests := []struct {
 		name        string

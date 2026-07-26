@@ -240,46 +240,168 @@ func ChunkString(input string, chunkSize int) []string {
 	return chunks
 }
 
-func ValidateRedirectUri(redirectUri string, validUris []string) (string, error) {
+// ValidateRedirectUri checks redirectUri against validUris. Exact matches are always allowed.
+// Wildcards are a security-sensitive, operator-controlled opt-in.
+func ValidateRedirectUri(redirectUri string, validUris []string, wildcardsEnabled bool) (string, error) {
 	if redirectUri == "" {
 		return "", nil
 	}
 
-	if len(validUris) > 0 {
-		for _, validUri := range validUris {
-			if matchUriTemplate(redirectUri, validUri) {
-				return redirectUri, nil
-			}
+	for _, validUri := range validUris {
+		if redirectUri == validUri {
+			return redirectUri, nil
+		}
+	}
+
+	if !wildcardsEnabled || unsafeWildcardRedirect(redirectUri) {
+		return "", errors.New("invalid redirect uri")
+	}
+
+	for _, validUri := range validUris {
+		if !strings.Contains(validUri, "*") {
+			continue
+		}
+		if matchUriTemplate(redirectUri, validUri) {
+			return redirectUri, nil
 		}
 	}
 
 	return "", errors.New("invalid redirect uri")
 }
 
-func matchUriTemplate(value string, template string) bool {
-	// Match exactly
-	if value == template {
-		return true
-	}
-
-	// Match all
+func matchUriTemplate(value, template string) bool {
 	if template == "*" {
 		return true
 	}
 
-	// Match wildcards
-	escapedTemplate := regexp.QuoteMeta(template)
-	escapedTemplate = strings.ReplaceAll(escapedTemplate, "\\*", "[a-zA-Z0-9-_]+")
-	escapedTemplate = fmt.Sprintf("^%s$", escapedTemplate)
+	valueScheme, valueAuthority, valuePath, valueHasAuthority := splitSchemeAuthorityPath(value)
+	templateScheme, templateAuthority, templatePath, templateHasAuthority := splitSchemeAuthorityPath(template)
 
-	regex, err := regexp.Compile(escapedTemplate)
+	if templateHasAuthority != valueHasAuthority {
+		return false
+	}
+
+	if templateHasAuthority {
+		if !strings.EqualFold(templateScheme, valueScheme) {
+			return false
+		}
+
+		if !validAuthorityTemplate(templateAuthority) ||
+			!matchAuthorityTemplate(valueAuthority, templateAuthority) {
+			return false
+		}
+	}
+
+	return matchPathTemplate(valuePath, templatePath)
+}
+
+func splitSchemeAuthorityPath(value string) (scheme, authority, pathAndBeyond string, hasAuthority bool) {
+	schemeSeparator := strings.Index(value, "://")
+	if schemeSeparator == -1 {
+		return "", "", value, false
+	}
+
+	scheme = value[:schemeSeparator]
+	rest := value[schemeSeparator+3:]
+	if pathIndex := strings.IndexAny(rest, "/?#"); pathIndex != -1 {
+		return scheme, rest[:pathIndex], rest[pathIndex:], true
+	}
+
+	return scheme, rest, "", true
+}
+
+func matchPathTemplate(value, template string) bool {
+	if value == template {
+		return true
+	}
+
+	// Path wildcards are only supported as the final character. Templates with a
+	// query or fragment remain exact-only.
+	if !strings.HasSuffix(template, "*") || strings.ContainsAny(template, "?#") {
+		return false
+	}
+
+	value = stripQueryAndFragment(value)
+	prefix := strings.TrimSuffix(template, "*")
+	return strings.HasPrefix(value, prefix) || value == strings.TrimSuffix(prefix, "/")
+}
+
+func stripQueryAndFragment(value string) string {
+	if index := strings.IndexAny(value, "?#"); index != -1 {
+		return value[:index]
+	}
+
+	return value
+}
+
+func matchAuthorityTemplate(value, template string) bool {
+	if strings.EqualFold(value, template) {
+		return true
+	}
+
+	escapedTemplate := regexp.QuoteMeta(template)
+	escapedTemplate = strings.ReplaceAll(escapedTemplate, "\\*", "[-A-Za-z0-9_]+")
+	regex, err := regexp.Compile(fmt.Sprintf("(?i)^%s$", escapedTemplate))
 	if err != nil {
 		return false
 	}
 
-	result := regex.MatchString(value)
+	return regex.MatchString(value)
+}
 
-	return result
+func validAuthorityTemplate(template string) bool {
+	for index, char := range template {
+		if char != '*' {
+			continue
+		}
+
+		beforeBoundary := index == 0 || template[index-1] == '.' || template[index-1] == ':'
+		afterBoundary := index == len(template)-1 || template[index+1] == '.' || template[index+1] == ':'
+		if !beforeBoundary || !afterBoundary {
+			return false
+		}
+	}
+
+	return true
+}
+
+func unsafeWildcardRedirect(value string) bool {
+	if strings.HasPrefix(value, "//") {
+		return true
+	}
+
+	scheme, authority, pathAndBeyond, hasAuthority := splitSchemeAuthorityPath(value)
+	if hasAuthority && (scheme == "" || authority == "" || strings.Contains(authority, "@")) {
+		return true
+	}
+
+	return hasPathTraversal(stripQueryAndFragment(pathAndBeyond))
+}
+
+func hasPathTraversal(rawPath string) bool {
+	candidate := rawPath
+	for i := 0; i < 8; i++ {
+		candidate = strings.ReplaceAll(candidate, "\\", "/")
+		for _, segment := range strings.Split(candidate, "/") {
+			if segment == ".." ||
+				(strings.HasPrefix(segment, "..") && len(segment) > 2 &&
+					(segment[2] == ';' || segment[2] < ' ')) {
+				return true
+			}
+		}
+
+		decoded, err := url.PathUnescape(candidate)
+		if err != nil {
+			return true
+		}
+		if decoded == candidate {
+			return false
+		}
+		candidate = decoded
+	}
+
+	// Fail closed on excessive encoding depth.
+	return true
 }
 
 func ParseAcceptType(raw string) AcceptType {

@@ -36,6 +36,7 @@ services:
       PROVIDER_URL: http://localhost:8000/default
       CLIENT_ID: traefik
       CLIENT_SECRET: test-secret
+      TOA_ENABLE_REDIRECT_URI_WILDCARDS: "true"
     depends_on:
       mock-oauth2-server:
         condition: service_healthy
