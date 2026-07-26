@@ -19,6 +19,10 @@ Starting with this fork's `v0.20.0`, the single `unauthorizedBehavior` option th
 If you're upgrading from a pre-split config (legacy single `unauthorizedBehavior`), move your existing value as-is to `unauthenticatedBehavior` to keep the same unauthenticated behavior. No change is needed for the 403 case unless you want to opt into `Challenge` there (e.g. step-up authentication; see [`authorizationParams`](#plugin-config-block) and [Authorization](./authorization.md)). Legacy configs that only set `unauthorizedBehavior` are also migrated automatically at startup.
 :::
 
+:::warning Redirect URI wildcard migration
+Redirect URI wildcards (including a bare `*`) now require explicitly setting `TOA_ENABLE_REDIRECT_URI_WILDCARDS=true` on the Traefik process. Without it, all allowlist entries are matched exactly, as required by OIDC/OAuth2. See [Redirect URI Wildcards](#redirect-uri-wildcards).
+:::
+
 :::caution
 It is highly recommended to change the default encryption-secret by providing your own 32-character secret using the `secret`-option.
 You can generate a random one here: https://it-tools.tech/token-generator?length=32
@@ -56,11 +60,11 @@ provider:
 | `callbackUri`* | no | `string` | `/oidc/callback` | Defines the callback url used by the IDP. This needs to be registered in your IDP. This may be either a relative URL or an absolute URL -- see also [Callback URLs](./callback-uri.md) |
 | `loginUri`* | no | `string` | *none* | An optional url, which should trigger the login-flow. The response of every other url is defined by the `unauthenticatedBehavior`-configuration.  |
 | `postLoginRedirectUri`* | no | `string` | *none* | An optional static redirect url where the user should be redirected after login. By default the user will be redirected to the url which triggered the login-flow. |
-| `validPostLoginRedirectUris` | no | `string[]` | *none* | A list of valid redirect uris when provided by the *redirect_uri* query parameter on the login-endpoint. The uri has to match exactly. Optionally you can use a `*` to match any character of `a-z, A-Z, 0-9, -, _`. You can also specify a single `*` which is a full wildcard but this is not recommended. |
+| `validPostLoginRedirectUris` | no | `string[]` | *none* | Allowed redirect URIs for the login endpoint's *redirect_uri* query parameter. Entries match exactly unless wildcard support is explicitly enabled. See [Redirect URI Wildcards](#redirect-uri-wildcards). |
 | `logoutUri`* | no | `string` | `/logout` | The url which should trigger the logout-flow. See [here](./how-it-works.md#logout) for more details. |
 | `frontChannelLogoutUri`* | no | `string` | `/frontchannel-logout` | Endpoint for [OIDC Front-Channel Logout](https://openid.net/specs/openid-connect-frontchannel-1_0.html). Requires a matching `iss` query parameter (and optional `sid`) before clearing the session. |
 | `postLogoutRedirectUri`* | no | `string` | `/` | The url where the user should be redirected after logout. |
-| `validPostLogoutRedirectUris` | no | `string[]` | *none* | A list of valid redirect uris when provided by the *redirect_uri* query parameter on the logout-endpoint. The uri has to match exactly. Optionally you can use a `*` to match any character of `a-z, A-Z, 0-9, -, _`. You can also specify a single `*` which is a full wildcard but this is not recommended. |
+| `validPostLogoutRedirectUris` | no | `string[]` | *none* | Allowed redirect URIs for the logout endpoint's *redirect_uri* query parameter. Entries match exactly unless wildcard support is explicitly enabled. See [Redirect URI Wildcards](#redirect-uri-wildcards). |
 | `cookieNamePrefix`* | no | `string` | `TraefikOidcAuth` | Specifies the prefix for all cookies used internally by the plugin. The final names are concatenated using dot-notation. Eg. `TraefikOidcAuth.Session`, `TraefikOidcAuth.CodeVerifier` etc. Please note that this prefix does not apply to *AuthorizationCookie* where the name can be set individually. |
 | `sessionCookie` | no | [`sessionCookie`](#session-cookie) | *none* | SessionCookie Configuration. See *SessionCookieConfig* block. |
 | `authorizationHeader` | no | [`authorizationHeader`](#authorization-header) | *none* | AuthorizationHeader Configuration. See *AuthorizationHeader* block. |
@@ -74,6 +78,19 @@ provider:
 | `requestedResources` | no | `string[]`| *none* | An array of resource URIs according to [RFC 8707](https://www.rfc-editor.org/rfc/rfc8707) for which the token should be requested. | 
 | `authorizationParams` | no | `map[string]string`| *none* | Additional query parameters to send to the IDP's authorization endpoint, eg. `acr_values` to request a specific authentication context (step-up authentication) or a default `prompt`. Reserved protocol parameters (`response_type`, `client_id`, `redirect_uri`, `state`, `scope`, `resource`) cannot be overridden this way and are ignored with a warning. A `prompt` query parameter on the incoming `/login` request still takes precedence over the configured value. |
 
+
+### Redirect URI Wildcards {#redirect-uri-wildcards}
+
+OIDC/OAuth2 requires exact redirect URI matching. To opt into wildcard matching, set `TOA_ENABLE_REDIRECT_URI_WILDCARDS=true` (or `1`) on the **Traefik process**. This is an instance-wide security decision, not a middleware option. When disabled, an entry containing `*` is treated literally and logs a startup warning.
+
+With wildcards enabled:
+
+- A host `*` matches exactly one label: `https://*.example.com/*` matches `https://app.example.com/home`, not `https://app.eu.example.com/home`.
+- A path `*` works only as the final character and spans any number of path segments: `/app/*` matches `/app`, `/app/index.html`, and `/app/a/b`.
+- Query strings and fragments are ignored for wildcard path matching but remain unchanged in the accepted redirect URI.
+- A bare `*` accepts any **safe** redirect URI and effectively disables allowlist protection. Avoid it.
+- Ambiguous host suffixes such as `https://example.com*`, protocol-relative URLs, user-info host spoofing, and encoded/double-encoded path traversal are rejected.
+- Path-only entries only match path-only redirects; full URLs only match full URLs.
 
 ## Provider Block {#provider}
 
