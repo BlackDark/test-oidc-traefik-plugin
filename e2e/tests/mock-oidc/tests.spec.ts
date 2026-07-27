@@ -112,6 +112,30 @@ test('logout', async ({ page }) => {
   expect(logoutResponse?.url()).toMatch(AUTH_URL);
 });
 
+test('relative wildcard post-login redirect survives callback', async ({ page }) => {
+  await configureTraefik(`
+http:
+${whoamiService()}
+
+  middlewares:
+    oidc-auth:
+      plugin:
+${baseMiddleware(`
+          loginUri: /login
+          validPostLoginRedirectUris:
+            - /app/*
+`)}
+
+${whoamiRouter()}
+`);
+
+  const loginPage = await page.goto('http://localhost:9080/login?redirect_uri=%2Fapp%2Ftarget');
+  expect(loginPage?.url()).toMatch(AUTH_URL);
+
+  const response = await login(page, 'admin', 'admin', 'http://localhost:9080/app/target');
+  expect(response.status()).toBe(200);
+});
+
 test('test two services is seamless', async ({ page }) => {
   await configureTraefik(`
 http:

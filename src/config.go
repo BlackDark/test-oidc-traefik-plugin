@@ -255,6 +255,22 @@ func New(uctx context.Context, next http.Handler, cfg *config.Config, name strin
 		}
 	}
 
+	// Redirect URI wildcards relax the OIDC/OAuth2 exact-match requirement, so
+	// operators must opt in once for the whole Traefik process.
+	redirectUriWildcardsEnabled, err := utils.ExpandEnvironmentVariableBoolean(
+		os.Getenv("TOA_ENABLE_REDIRECT_URI_WILDCARDS"),
+		false,
+	)
+	if err != nil {
+		logger.Log(logging.LevelError, "Invalid TOA_ENABLE_REDIRECT_URI_WILDCARDS value: %s", err.Error())
+		return nil, err
+	}
+
+	if !redirectUriWildcardsEnabled {
+		warnDisabledRedirectWildcards(logger, "validPostLoginRedirectUris", cfg.ValidPostLoginRedirectUris)
+		warnDisabledRedirectWildcards(logger, "validPostLogoutRedirectUris", cfg.ValidPostLogoutRedirectUris)
+	}
+
 	httpTransport := &http.Transport{
 		// MaxIdleConns:    10,
 		// IdleConnTimeout: 30 * time.Second,
@@ -272,16 +288,30 @@ func New(uctx context.Context, next http.Handler, cfg *config.Config, name strin
 	logger.Log(logging.LevelInfo, "Configuration loaded successfully, starting OIDC Auth middleware...")
 
 	return &TraefikOidcAuth{
-		logger:                   logger,
-		next:                     next,
-		httpClient:               httpClient,
-		ProviderURL:              parsedURL,
-		ClientJwtPrivateKey:      clientAssertionPrivateKey,
-		CallbackURL:              parsedCallbackURL,
-		Config:                   cfg,
-		SessionStorage:           session.CreateCookieSessionStorage(),
-		BypassAuthenticationRule: conditionalAuth,
+		logger:                      logger,
+		next:                        next,
+		httpClient:                  httpClient,
+		ProviderURL:                 parsedURL,
+		ClientJwtPrivateKey:         clientAssertionPrivateKey,
+		CallbackURL:                 parsedCallbackURL,
+		Config:                      cfg,
+		SessionStorage:              session.CreateCookieSessionStorage(),
+		BypassAuthenticationRule:    conditionalAuth,
+		RedirectUriWildcardsEnabled: redirectUriWildcardsEnabled,
 	}, nil
+}
+
+func warnDisabledRedirectWildcards(logger *logging.Logger, field string, uris []string) {
+	for _, uri := range uris {
+		if strings.Contains(uri, "*") {
+			logger.Log(
+				logging.LevelWarn,
+				"%s contains %q, but TOA_ENABLE_REDIRECT_URI_WILDCARDS is disabled; it will only match that exact string",
+				field,
+				uri,
+			)
+		}
+	}
 }
 
 // migrateAuthBehaviors maps legacy single UnauthorizedBehavior onto the split
