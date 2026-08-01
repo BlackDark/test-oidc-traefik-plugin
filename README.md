@@ -1,7 +1,6 @@
-# Traefik OpenID Connect Middleware
+# OIDC Auth: Traefik Middleware + Standalone ext_authz Service
 
 ![E2E Tests](https://img.shields.io/github/actions/workflow/status/sevensolutions/traefik-oidc-auth/.github%2Fworkflows%2Fe2e-tests.yml?logo=github&label=E2E%20Tests&color=green)
-[![Release](https://img.shields.io/github/v/release/sevensolutions/traefik-oidc-auth?label=Release)](https://github.com/sevensolutions/traefik-oidc-auth/releases/latest)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](https://github.com/sevensolutions/traefik-oidc-auth/blob/main/LICENSE)
 
 <p align="left" style="text-align:left;">
@@ -10,7 +9,12 @@
   </a>
 </p>
 
-A traefik Plugin for securing the upstream service with OpenID Connect acting as a relying party.
+This repo secures upstream services with OpenID Connect (acting as an OIDC relying party), in two forms sharing one core implementation:
+
+1. **Traefik middleware plugin** (`src/`) — the primary, mature component. A hardened fork of [sevensolutions/traefik-oidc-auth](https://github.com/sevensolutions/traefik-oidc-auth) (sealed OIDC state, PKCE-in-state, login CSRF, nonce, safer defaults — see `docs/adr/`). This is what Traefik's plugin catalog loads.
+2. **Standalone ext_authz service** (`cmd/extauth-server/`) — **experimental.** Exposes the same OIDC/session/authorization logic behind Envoy's `ext_authz` contract (HTTP and gRPC modes), so it can run behind any gateway that speaks that protocol — Envoy Gateway's `SecurityPolicy`, and in the future the standardized [Gateway API `ExternalAuth` filter (GEP-1494)](https://gateway-api.sigs.k8s.io/geps/gep-1494/) once an implementation actually supports it — not just Traefik. See [`docs/extauth-server.md`](docs/extauth-server.md) for usage, gateway compatibility, and a security review.
+
+Both share the same core packages (`src/oidc`, `src/session`, `src/rules`, `src/predicate`, `src/utils`) — one codebase, two transports, kept as one repo deliberately (see [ADR-0005](docs/adr/0005-standalone-ext-authz-service/) for why).
 
 > [!NOTE]
 > This document always represents the latest version, which may not have been released yet.
@@ -18,10 +22,15 @@ A traefik Plugin for securing the upstream service with OpenID Connect acting as
 > You can use the GIT-Tags to check individual versions.
 
 > [!WARNING]
-> This middleware is under active development and breaking changes may occur.
-> It is only tested against traefik v3+.
+> The Traefik middleware is under active development and breaking changes may occur. It is only tested against Traefik v3+.
+>
+> The standalone ext_authz service (`cmd/extauth-server`) is **experimental** — functionally verified end-to-end against real infrastructure (Traefik `forwardAuth` and Envoy Gateway `SecurityPolicy`, both HTTP and gRPC modes, with real IdP logins), but newer and less battle-tested than the Traefik middleware itself. See its docs for known gaps before running it in production.
 
-## Tested Providers
+## Traefik middleware
+
+Used as a Traefik plugin (`import: github.com/BlackDark/test-oidc-traefik-plugin/src` in Traefik's static/plugin config). All hardening decisions are recorded in [`docs/adr/`](docs/adr/).
+
+### Tested Providers
 
 | Provider | Status | Notes |
 |---|---|---|
@@ -35,13 +44,18 @@ A traefik Plugin for securing the upstream service with OpenID Connect acting as
 | [GitHub](https://github.com) | ❌ | GitHub doesn't seem to support OIDC, only plain OAuth. |
 | [Logto](https://logto.io/) | ✅ | |
 
-## 📚 Documentation
+### 📚 Documentation
 
-Please see the full documentation [HERE](https://traefik-oidc-auth.sevensolutions.cc/).
+The Traefik middleware's config reference and usage docs are built from the upstream project this fork is based on: [traefik-oidc-auth.sevensolutions.cc](https://traefik-oidc-auth.sevensolutions.cc/). Fields and behaviors added by this fork's hardening work are documented in [`docs/adr/`](docs/adr/) instead, since they diverge from upstream.
 
-> [!NOTE]
-> The documentation is being built from the *production* branch, representing the latest released version.
-> If you want to check the documentation of the main branch to see whats comming in the next version, [see here](https://main.traefik-oidc-auth.pages.dev/).
+## Standalone ext_authz service (experimental)
+
+`cmd/extauth-server` runs the same OIDC logic as a standalone binary speaking Envoy's `ext_authz` protocol (HTTP or gRPC), for use behind Envoy Gateway, Istio, Contour, or any other `ext_authz`-compatible gateway — anything that isn't Traefik. Intended primarily as a path toward Gateway API's standardized external-auth filter once a real implementation of it exists (currently unimplemented everywhere checked — see [ADR-0005](docs/adr/0005-standalone-ext-authz-service/)); today, wire it via each gateway's own vendor-specific mechanism (e.g. Envoy Gateway's `SecurityPolicy`).
+
+See [`docs/extauth-server.md`](docs/extauth-server.md) for:
+- Running it, and env var reference
+- Which mode to use for which gateway (with a known, currently-unfixed Envoy Gateway HTTP-mode bug to avoid)
+- A full security review (findings fixed, findings accepted as-is, and known gaps)
 
 ## 🧪 Local Development and Testing
 
@@ -52,6 +66,8 @@ You can then run the following command to list all available tasks:
 ```
 task --list
 ```
+
+### Traefik middleware
 
 The easiest way to get started is to run the plugin with Keycloak because this repo comes with a pre-configured instance.
 Just do:
@@ -78,12 +94,27 @@ And then do:
 If you want to play around with the plugin config, modify the file `workspaces/configs/http.yml`.
 Changes will be reloaded automatically and you should see some debug output in the container logs.
 
+### Standalone ext_authz service
+
+```sh
+CONFIG_FILE=./config.json LISTEN_ADDR=:9002 GRPC_LISTEN_ADDR=:9003 go run ./cmd/extauth-server
+```
+
+See [`docs/extauth-server.md`](docs/extauth-server.md) for config format, `TRUSTED_PROXIES`, and gateway-specific wiring examples (Traefik `forwardAuth`, Envoy Gateway `SecurityPolicy`).
+
+Run its test suite from `cmd/extauth-server`:
+
+```
+task test:extauth
+```
+
+## Attribution
+
+The Traefik middleware in `src/` is a fork of [sevensolutions/traefik-oidc-auth](https://github.com/sevensolutions/traefik-oidc-auth). Credit to the original author for the base implementation; this fork's changes (security hardening in `docs/adr/`, and the standalone `cmd/extauth-server` service) are independent additions on top of it, not upstream contributions — if you're looking for the original project, go there.
+
 ## ☕ Support
 
-I put a lot of ❤️ and effort into this project. PRs are very welcome and together we can make this a great free alternative to the enterprise OIDC plugin 😎.
-Every contribution helps me to improve it, fix bugs and develop new features.  
-Please also dont forget to ★ the repo.  
-If you'd like to make a small donation, I'd be very grateful. Just click the button below.  
-Thank You!
+If you find this useful, consider supporting the original upstream project, whose work this fork builds on:
 
 [![](https://img.shields.io/static/v1?label=Sponsor&color=blue&message=%E2%9D%A4&logo=GitHub)](https://github.com/sponsors/sevensolutions)
+

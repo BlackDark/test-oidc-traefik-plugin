@@ -35,16 +35,33 @@ tasks:
     cmds:
       - npm start
 
+  build:extauth:
+    desc: 'Build the standalone ext-authz server binary'
+    dir: 'cmd/extauth-server'
+    cmds:
+      - go build -o ../../bin/extauth-server .
+  run:extauth:
+    desc: 'Run the standalone ext-authz server (needs CONFIG_FILE, default ./config.json)'
+    dir: 'cmd/extauth-server'
+    cmds:
+      - go run .
+
   test:
     desc: 'Run all unit and end to end tests'
     deps:
       - test:unit
+      - test:extauth
       - test:e2e
   test:unit:
     desc: 'Run all go unit tests'
     dir: 'src'
     cmds:
       - go test
+  test:extauth:
+    desc: 'Run unit tests for the standalone ext-authz server'
+    dir: 'cmd/extauth-server'
+    cmds:
+      - go test ./...
   test:e2e:
     desc: 'Run all end to end tests'
     dir: 'e2e'
@@ -62,10 +79,22 @@ tasks:
     desc: 'Lint and check Go formatting'
     cmds:
       - golangci-lint run ./src/...
+      - task: lint:go:extauth
+  lint:go:extauth:
+    desc: 'Lint the standalone ext-authz server (separate Go module)'
+    dir: 'cmd/extauth-server'
+    cmds:
+      - golangci-lint run ./...
   lint:sec:
     desc: 'Go vulnerability check (govulncheck)'
     cmds:
       - go run golang.org/x/vuln/cmd/govulncheck@latest ./src/...
+      - task: lint:sec:extauth
+  lint:sec:extauth:
+    desc: 'Go vulnerability check for the standalone ext-authz server (separate Go module)'
+    dir: 'cmd/extauth-server'
+    cmds:
+      - go run golang.org/x/vuln/cmd/govulncheck@latest ./...
   lint:website:
     desc: 'Lint website with Biome'
     dir: 'website'
@@ -87,6 +116,12 @@ tasks:
     desc: 'Format Go code'
     cmds:
       - golangci-lint run --fix ./src/...
+      - task: fmt:go:extauth
+  fmt:go:extauth:
+    desc: 'Format the standalone ext-authz server (separate Go module)'
+    dir: 'cmd/extauth-server'
+    cmds:
+      - golangci-lint run --fix ./...
   fmt:website:
     desc: 'Format website with Biome'
     dir: 'website'
