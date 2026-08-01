@@ -168,3 +168,26 @@ func TestServeHTTP_FrontchannelNoSessionReturns200(t *testing.T) {
 		}
 	}
 }
+
+// TestAttachHeaders_SetsRequestHeadersForNext verifies the header-templating
+// behavior that cmd/extauth-server's "allow" handler relies on: attachHeaders
+// writes rendered header values onto req.Header before next is invoked, so
+// copying req.Header in the ext_authz allow response is sufficient.
+func TestAttachHeaders_SetsRequestHeadersForNext(t *testing.T) {
+	toa := newAuthBehaviorTestAuth(t)
+	toa.Config.Headers = []config.HeaderConfig{
+		{Name: "X-User", Value: "{{ .claims.sub }}", IncludeWhen: "Always"},
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "https://app.example.com/secret", nil)
+	sess := &session.SessionState{}
+	claims := map[string]interface{}{"sub": "user-123"}
+
+	if err := toa.attachHeaders(req, sess, claims, false, true); err != nil {
+		t.Fatalf("attachHeaders: %v", err)
+	}
+
+	if got := req.Header.Get("X-User"); got != "user-123" {
+		t.Fatalf("X-User=%q want user-123", got)
+	}
+}
