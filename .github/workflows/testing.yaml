@@ -30,3 +30,11 @@ jobs:
       - name: Test with the Go CLI
         working-directory: ./src
         run: go test
+
+      - name: Build extauth-server
+        working-directory: ./cmd/extauth-server
+        run: go build
+
+      - name: Test extauth-server
+        working-directory: ./cmd/extauth-server
+        run: go test

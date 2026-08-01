@@ -37,6 +37,13 @@ jobs:
           working-directory: .
           args: ./src/...
 
+      - name: golangci-lint (extauth-server)
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.12.2
+          working-directory: ./cmd/extauth-server
+          args: ./...
+
   govulncheck:
     name: Go (govulncheck)
     runs-on: ubuntu-latest
@@ -56,6 +63,27 @@ jobs:
 
       - name: govulncheck
         run: go run golang.org/x/vuln/cmd/govulncheck@latest ./src/...
+
+  govulncheck-extauth:
+    name: Go extauth-server (govulncheck)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Setup Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: cmd/extauth-server/go.mod
+          cache: true
+
+      - name: govulncheck
+        working-directory: ./cmd/extauth-server
+        run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
 
   website:
     name: Website (Biome)
