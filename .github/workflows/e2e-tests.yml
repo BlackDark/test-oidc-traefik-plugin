@@ -7,16 +7,28 @@ on:
     paths-ignore:
       - "website/**"
 
+permissions: {}
+
+concurrency:
+  group: e2e-tests-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
+    name: E2E tests
     timeout-minutes: 60
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     defaults:
       run:
         working-directory: ./e2e
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
 
       # Note: You cannot connect from the "Warp" terminal for whatever reason.
       # - name: Setup tmate session
@@ -25,7 +37,7 @@ jobs:
       #     detached: true
 
       - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
           bun-version: latest
 
@@ -42,7 +54,8 @@ jobs:
         env:
           CI: true
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload Playwright report
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: ${{ !cancelled() }}
         with:
           name: playwright-report

@@ -1,16 +1,21 @@
 name: Backport
 
 on:
-  pull_request_target:
+  pull_request_target: # zizmor: ignore[dangerous-triggers] no PR code is checked out; only used to create backport PRs via API
     types: ["labeled", "closed"]
 
-permissions:
-  contents: write # so it can comment
-  pull-requests: write # so it can create pull requests
-  
+permissions: {}
+
+concurrency:
+  group: backport-${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
 jobs:
   backport:
     name: Backport PR
+    permissions:
+      contents: write # so it can comment
+      pull-requests: write # so it can create pull requests
     if: >
       github.event.pull_request.merged &&
       (
@@ -20,7 +25,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Backport Action
-        uses: sorenlouv/backport-github-action@v9.5.1
+        uses: sorenlouv/backport-github-action@ad888e978060bc1b2798690dd9d03c4036560947 # v9.5.1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           auto_backport_label_prefix: backport/
