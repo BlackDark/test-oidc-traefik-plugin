@@ -113,6 +113,9 @@ func validateMultiConfig(cfg *multiConfig) error {
 			if n == "" {
 				return fmt.Errorf("client %q: empty host", c.ID)
 			}
+			if strings.HasPrefix(n, "*.") && len(n) < 4 {
+				return fmt.Errorf("client %q: invalid wildcard host %q", c.ID, n)
+			}
 			if _, ok := seen[n]; ok {
 				continue // same client listing aliases that normalize equal
 			}

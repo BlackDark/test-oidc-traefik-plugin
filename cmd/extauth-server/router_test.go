@@ -55,6 +55,46 @@ func TestHostRouter_UnknownHostForbidden(t *testing.T) {
 	}
 }
 
+func TestHostRouter_WildcardFallback(t *testing.T) {
+	var hitExact, hitWild atomic.Int32
+	r := newHostRouter()
+	r.swap(map[string]http.Handler{
+		"grafana.example.com": http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			hitExact.Add(1)
+			w.WriteHeader(http.StatusOK)
+		}),
+		"*.example.com": http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			hitWild.Add(1)
+			w.WriteHeader(http.StatusAccepted)
+		}),
+	})
+
+	rw := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "http://grafana.example.com/", nil)
+	req.Host = "grafana.example.com"
+	r.ServeHTTP(rw, req)
+	if rw.Code != http.StatusOK || hitExact.Load() != 1 || hitWild.Load() != 0 {
+		t.Fatalf("exact should win: code=%d exact=%d wild=%d", rw.Code, hitExact.Load(), hitWild.Load())
+	}
+
+	rw = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodGet, "http://other.example.com/", nil)
+	req.Host = "other.example.com"
+	r.ServeHTTP(rw, req)
+	if rw.Code != http.StatusAccepted || hitWild.Load() != 1 {
+		t.Fatalf("wildcard: code=%d wild=%d", rw.Code, hitWild.Load())
+	}
+
+	// apex must not match *.example.com
+	rw = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodGet, "http://example.com/", nil)
+	req.Host = "example.com"
+	r.ServeHTTP(rw, req)
+	if rw.Code != http.StatusForbidden {
+		t.Fatalf("apex status=%d want 403", rw.Code)
+	}
+}
+
 func TestHostRouter_SwapAtomic(t *testing.T) {
 	r := newHostRouter()
 	r.swap(map[string]http.Handler{
