@@ -62,7 +62,7 @@ Rules:
 - `clients` required, length ≥ 1
 - Each entry: unique `id`, `hosts` length ≥ 1, remaining fields = today’s `config.Config`
 - No top-level shared `secret` / `provider`
-- Host match: exact, case-insensitive; strip `:port` if present
+- Host match: exact, case-insensitive; strip `:port` if present. Optional `*.suffix` wildcards (exact wins)
 - `${ENV}` and `${file:/path}` expansion unchanged
 
 K8s: ConfigMap mounts the YAML; Secret volume mounts files under `/secrets/<id>/…`.
