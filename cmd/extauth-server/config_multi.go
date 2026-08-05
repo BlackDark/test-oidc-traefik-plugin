@@ -1,14 +1,16 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"os"
 	"strings"
 
+	"gopkg.in/yaml.v3"
+
 	src "github.com/BlackDark/test-oidc-traefik-plugin/src"
 	"github.com/BlackDark/test-oidc-traefik-plugin/src/config"
-	"gopkg.in/yaml.v3"
 )
 
 // multiConfig is the extauth-server YAML root. Breaking change vs single-client JSON.
@@ -46,7 +48,7 @@ func parseMultiConfig(data []byte) (*multiConfig, error) {
 		return nil, fmt.Errorf("parsing yaml: %w", err)
 	}
 	if len(raw.Clients) == 0 {
-		return nil, fmt.Errorf("clients: must contain at least one client")
+		return nil, errors.New("clients: must contain at least one client")
 	}
 
 	out := &multiConfig{Clients: make([]clientEntry, 0, len(raw.Clients))}
