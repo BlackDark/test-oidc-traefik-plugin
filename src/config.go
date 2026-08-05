@@ -75,7 +75,7 @@ func New(uctx context.Context, next http.Handler, cfg *config.Config, name strin
 
 	logger := logging.CreateLogger(cfg.LogLevel)
 
-	logger.Log(logging.LevelInfo, "Loading Configuration...")
+	logger.Log(logging.LevelDebug, "Loading configuration...")
 
 	if cfg.Provider == nil {
 		return nil, errors.New("missing provider configuration")
@@ -187,13 +187,8 @@ func New(uctx context.Context, next http.Handler, cfg *config.Config, name strin
 		return nil, err
 	}
 
-	logger.Log(logging.LevelInfo, "Provider Url: %v", parsedURL)
-	logger.Log(logging.LevelInfo, "I will use this URL for callbacks from the IDP: %v", parsedCallbackURL)
-	if utils.UrlIsAbsolute(parsedCallbackURL) {
-		logger.Log(logging.LevelInfo, "Callback URL is absolute, will not overlay wrapped services")
-	} else {
-		logger.Log(logging.LevelInfo, "Callback URL is relative, will overlay any wrapped host")
-	}
+	logger.Log(logging.LevelDebug, "Provider URL: %v", parsedURL)
+	logger.Log(logging.LevelDebug, "Callback URI: %v (absolute=%t)", parsedCallbackURL, utils.UrlIsAbsolute(parsedCallbackURL))
 	logger.Log(logging.LevelDebug, "Scopes: %s", strings.Join(cfg.Scopes, ", "))
 	logger.Log(logging.LevelDebug, "SessionCookie: %v", cfg.SessionCookie)
 
@@ -285,7 +280,8 @@ func New(uctx context.Context, next http.Handler, cfg *config.Config, name strin
 		Transport: httpTransport,
 	}
 
-	logger.Log(logging.LevelInfo, "Configuration loaded successfully, starting OIDC Auth middleware...")
+	logger.Log(logging.LevelInfo, "ready provider=%s clientId=%s callback=%s cookiePrefix=%s",
+		parsedURL.String(), cfg.Provider.ClientId, cfg.CallbackUri, cfg.CookieNamePrefix)
 
 	return &TraefikOidcAuth{
 		logger:                      logger,

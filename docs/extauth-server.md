@@ -7,14 +7,57 @@ Source: `cmd/extauth-server/`.
 ## Running
 
 ```sh
-CONFIG_FILE=./config.json LISTEN_ADDR=:9002 GRPC_LISTEN_ADDR=:9003 go run ./cmd/extauth-server
+CONFIG_FILE=./config.yaml LISTEN_ADDR=:9002 GRPC_LISTEN_ADDR=:9003 go run ./cmd/extauth-server
 ```
 
-- `CONFIG_FILE` — path to a JSON config file, same shape as `.traefik.yml`'s `testData` / Traefik's dynamic plugin config (see `src/config/config.go` for all fields). Values support `${VAR}` and `${file:/path}` expansion (same as Traefik).
+- `CONFIG_FILE` — path to a **YAML** multi-client config (default `config.yaml`). **Breaking:** single-client JSON is no longer supported.
 - `LISTEN_ADDR` — HTTP mode listener. Default `:9002`.
 - `GRPC_LISTEN_ADDR` — gRPC mode listener. Unset by default (gRPC server does not start unless set).
+- `SECRET_WATCH_DIRS` — optional comma-separated directories to watch (in addition to the config file's directory). Use for mounted Secret volumes so `${file:…}` rotations trigger reload.
+- `SIGHUP` — triggers the same reload path as file watch.
 
-Both modes can run simultaneously against the same config/session state — pick whichever your gateway supports; see the compatibility table below.
+Both modes can run simultaneously against the same Host→client map — pick whichever your gateway supports; see the compatibility table below.
+
+## Multi-client config
+
+One process serves many OIDC clients keyed by **Host** (exact, case-insensitive; port stripped). Unknown Host → **403**.
+
+```yaml
+clients:
+  - id: grafana
+    hosts:
+      - grafana.example.com
+    secret: ${file:/secrets/grafana/cookie-secret}   # exactly 32 chars after expand
+    provider:
+      url: https://idp.example.com
+      clientId: grafana
+      clientSecret: ${file:/secrets/grafana/client-secret}
+    cookieNamePrefix: grafana
+    callbackUri: /oidc/callback
+    # …all other fields from src/config/config.go (Traefik camelCase YAML keys)
+  - id: argo
+    hosts:
+      - argo.example.com
+    secret: ${file:/secrets/argo/cookie-secret}
+    provider:
+      url: https://idp.example.com
+      clientId: argo
+      clientSecret: ${file:/secrets/argo/client-secret}
+    cookieNamePrefix: argo
+```
+
+Rules:
+
+- `clients` required, ≥1 entry
+- Unique `id`, unique normalized hosts across clients, unique `cookieNamePrefix`, unique cookie `secret` (raw and after `${…}` expand)
+- No top-level shared provider/secret — everything per client
+- Values support `${VAR}` and `${file:/path}` expansion (same as Traefik plugin)
+
+**Reload:** file watch (debounced) on the config directory + `SECRET_WATCH_DIRS`, and `SIGHUP`. Bad reload keeps the previous map; bad boot exits 1.
+
+**K8s tip:** ConfigMap for the YAML; Secret volume for files under `/secrets/<id>/…`. Prefer `${file:…}` over env for secrets.
+
+**Trust:** same-org clients in one process share blast radius. Split Deployments for cross-tenant / high-value isolation.
 
 ## Network exposure
 
@@ -91,8 +134,9 @@ Reviewed 2026-07-31 alongside the gRPC mode addition. Findings and fixes below; 
 
 ### Reviewed and accepted as-is
 
-- **Sessions are stateless** (`src/session/cookieSessionStorage.go` — encrypted into the session cookie via `config.Secret`, no server-side store). `extauth-server` is horizontally scalable with zero shared state, as long as all replicas mount the same `secret`. This is inherited from the core plugin, not something this package adds, but it directly determines the deployment model (any number of stateless replicas behind a plain `ClusterIP` Service).
-- **JWKS/OIDC-discovery caching** (`src/oidc/jwks.go`) is shared correctly across both HTTP and gRPC listeners because `main.go` calls `src.New(...)` exactly once and passes the single resulting `handler` to both `runGRPCServer` and the HTTP `http.Server`. Neither mode re-fetches JWKS or the discovery document independently.
+- **Sessions are stateless** (`src/session/cookieSessionStorage.go` — encrypted into the session cookie via each client's `secret`, no server-side store). Horizontally scalable as long as all replicas mount the same multi-client config and secrets.
+- **Host-keyed multi-client:** Unknown Host → 403 (no default client). Tenant selection security depends on gateway-only reachability (`NetworkPolicy`) and a narrow `TRUSTED_PROXIES` for HTTP mode — Host / `X-Forwarded-Host` chooses which OIDC client config applies. Split Deployments for untrusted / cross-tenant clients.
+- **JWKS/OIDC-discovery caching** is per client handler (`src.New` once per client). HTTP and gRPC share the same Host→handler map, so a given client uses one discovery/JWKS cache.
 - **`httptest.NewRecorder()` per gRPC request** — in-memory buffer, no I/O, negligible overhead; this is the standard way to capture an `http.ResponseWriter`'s output without a real network hop, and is the correct choice here since `TraefikOidcAuth.ServeHTTP` writes directly to a `ResponseWriter` and cannot be restructured to return a response value without touching the core `src` package (out of scope, and would diverge Traefik-mode behavior from ext_authz-mode behavior).
 - **Cookie header reconstruction in gRPC mode** (`buildHTTPRequest`, splitting merged header values on `,`) — correct for the common case. Envoy's `AttributeContext.HttpRequest.headers` map merges same-key headers with a comma per the HTTP spec; cookie-pairs cannot legally contain a literal comma (RFC 6265 `cookie-octet` grammar excludes it), so splitting a merged `Cookie` value back apart on `,` cannot corrupt a well-formed single `Cookie:` header (the overwhelmingly common case: one `Cookie` header, `;`-separated pairs, no comma splitting applied since there's nothing to split). Only a theoretical concern for non-conformant clients that send multiple raw `Cookie:` lines, which is a client bug, not a gap in this code.
 - **gRPC message size limits** — not set explicitly; grpc-go's default max receive size (4 MiB) already bounds request size at the transport layer before it reaches `buildHTTPRequest`.
