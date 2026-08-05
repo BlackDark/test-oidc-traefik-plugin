@@ -20,7 +20,7 @@ Both modes can run simultaneously against the same Host→client map — pick wh
 
 ## Multi-client config
 
-One process serves many OIDC clients keyed by **Host** (exact, case-insensitive; port stripped). Unknown Host → **403**.
+One process serves many OIDC clients keyed by **Host** (exact, case-insensitive; port stripped; optional `*.suffix` wildcards, exact wins). Unknown Host → **403**.
 
 ```yaml
 clients:
