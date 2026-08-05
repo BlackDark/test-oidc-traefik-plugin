@@ -174,7 +174,7 @@ func (toa *TraefikOidcAuth) validateTokenLocally(tokenString string, expectedNon
 	if err != nil {
 		// If the token is expired, reloading JWKS won't help — skip the retry.
 		if isTokenExpiredError(err) {
-			toa.logger.Log(logging.LevelInfo, "The token is expired.")
+			toa.logger.Log(logging.LevelDebug, "token expired")
 			return false, nil, err
 		}
 
@@ -187,7 +187,7 @@ func (toa *TraefikOidcAuth) validateTokenLocally(tokenString string, expectedNon
 		_, err = parser.ParseWithClaims(tokenString, claims, toa.Jwks.Keyfunc)
 		if err != nil {
 			if isTokenExpiredError(err) {
-				toa.logger.Log(logging.LevelInfo, "The token is expired.")
+				toa.logger.Log(logging.LevelDebug, "token expired")
 			} else {
 				toa.logger.Log(logging.LevelError, "Failed to parse token: %v", err)
 			}
