@@ -24,6 +24,7 @@
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
 import fs from 'node:fs';
+import https from 'node:https';
 import path from 'node:path';
 import { expect, type Page, type Response, test } from '@playwright/test';
 import * as dockerCompose from 'docker-compose';
@@ -39,6 +40,8 @@ const PLUGIN_SECRET = '0123456789abcdef0123456789abcdef';
 const CERT_DIR = path.join(__dirname, 'certificates');
 
 const X509_UNKNOWN_AUTHORITY = 'x509: certificate signed by unknown authority';
+// Must match the -subj CN in gencerts.sh.
+const CA_COMMON_NAME = 'Mock OIDC Test CA';
 
 /**
  * T2's equivalence check compares the two config forms against EACH OTHER, and
@@ -285,6 +288,44 @@ async function waitForFailedRequest(timeoutMs = 30_000): Promise<number> {
   );
 }
 
+/**
+ * Prove the TLS terminator is actually serving the certificate gencerts.sh made,
+ * by reading the peer certificate off the wire and checking its issuer.
+ *
+ * This exists because "x509: certificate signed by unknown authority" has three
+ * indistinguishable causes - the terminator serves a different certificate, the
+ * plugin never received the bundle, or the plugin received it and still cannot
+ * build a path - and guessing between them from the failure message alone wasted
+ * two CI runs. It is an assertion, not a log line: if this passes and the login
+ * still fails, the fault is unambiguously on the plugin-config side.
+ */
+async function expectServedCertFromOurCa(): Promise<void> {
+  const peer = await new Promise<{ subject: unknown; issuer: unknown }>((resolve, reject) => {
+    const req = https.request(
+      { host: '127.0.0.1', port: 8443, path: '/isalive', rejectUnauthorized: false },
+      (res) => {
+        res.resume();
+        resolve(res.socket.getPeerCertificate());
+      },
+    );
+    req.on('error', reject);
+    req.end();
+  });
+
+  const issuer = peer.issuer as { CN?: string } | undefined;
+  const subject = peer.subject as { CN?: string } | undefined;
+  const issuerCN = issuer?.CN ?? JSON.stringify(issuer);
+  const subjectCN = subject?.CN ?? JSON.stringify(subject);
+
+  expect(
+    issuerCN,
+    `the TLS terminator served a certificate issued by "${issuerCN}" (subject "${subjectCN}"), ` +
+      `but gencerts.sh signs the leaf with "${CA_COMMON_NAME}". Either the certificates ` +
+      `directory was not generated for this run, or the terminator is not the one serving 8443.`,
+  ).toBe(CA_COMMON_NAME);
+  expect(subjectCN).toBe('localhost');
+}
+
 async function login(page: Page, username: string, password: string, waitForUrl: string) {
   await page.locator('#username').waitFor({ state: 'visible' });
   await page.locator('#username').fill(username);
@@ -343,11 +384,23 @@ test.afterAll('Stopping mock-oidc-tls stack', async () => {
 });
 
 test('T1 cABundleFile with the CA that signed the IdP cert completes a login', async ({ page }) => {
+  // Pin both halves of the contract before the login: the terminator must serve
+  // our CA's leaf, and the plugin must report that it loaded our CA file. If
+  // either is false the login below cannot succeed, and saying which one is the
+  // difference between a five-second fix and a guessing loop.
+  await expectServedCertFromOurCa();
+
   const mark = await traefikLogMark();
   await writeConfig(
     oidcConfig(`
             cABundleFile: "/certificates/ca.pem"`),
   );
+
+  // The plugin logs this at DEBUG once it has read and appended the CA. Its
+  // absence, with a successful TLS-terminator check above, means the option is
+  // not reaching the plugin at all - which is a different bug from the option
+  // being present and the chain still failing.
+  await waitForTraefikLog(mark, 'Loaded CA bundle from /certificates/ca.pem');
 
   // Proves both that Traefik applied the rewrite and that cABundleFile let the
   // plugin finish discovery against the mock's HTTPS listener.
