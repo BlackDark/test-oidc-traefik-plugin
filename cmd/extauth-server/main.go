@@ -50,6 +50,16 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Log the routing table so an operator can confirm which Host maps to which
+	// client without guessing from a 403, and so a mis-keyed config shows up in
+	// the startup log rather than only at request time. Re-logged on every hot
+	// reload by doReload.
+	if startupCfg, err := parseMultiConfigFile(configPath); err == nil {
+		for _, c := range startupCfg.Clients {
+			fmt.Printf("extauth-server: client %q serving host(s) %v\n", c.ID, c.Hosts)
+		}
+	}
+
 	reload := func() {
 		doReload(ctx, &reloadMu, router, configPath, allow, factory)
 	}
@@ -67,6 +77,9 @@ func main() {
 		}()
 	}
 
+	// Log the routing table so an operator can confirm which Host maps to which
+	// client without guessing from a 403, and so a mis-keyed config is visible in
+	// the startup log rather than only at request time.
 	fmt.Println("extauth-server: multi-client Host routing — restrict ingress to the gateway (NetworkPolicy); set TRUSTED_PROXIES narrowly for HTTP mode")
 	fmt.Printf("extauth-server listening on %s\n", listenAddr)
 	httpServer := &http.Server{
