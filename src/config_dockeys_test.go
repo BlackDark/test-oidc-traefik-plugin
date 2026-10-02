@@ -29,12 +29,18 @@ import (
 // entirely on the Traefik path. So a plugin option documented as `max_session_lifetime_seconds`
 // decodes to the zero value and every Traefik deployment silently loses that security control.
 //
-// The json tags are NOT dead weight: cmd/extauth-server/main.go:223 loads its own CONFIG_FILE
-// with encoding/json, which DOES honour them. The two configuration surfaces therefore
-// deliberately use different spellings for the same option:
+// The struct tags are NOT dead weight: cmd/extauth-server loads its own config
+// file with gopkg.in/yaml.v3 against the `yaml:"..."` tags, and the `json:"..."`
+// tags still describe the wire shape for anything that encodes the config as
+// JSON. The two configuration surfaces therefore use different spellings for
+// the same option:
 //
-//	Traefik (mapstructure, no TagName) : maxSessionLifetimeSeconds   (Go field name)
-//	extauth-server (encoding/json)      : max_session_lifetime_seconds (json tag)
+//	Traefik (mapstructure, no TagName) : maxSessionLifetimeSeconds    (Go field name)
+//	extauth-server (yaml.v3 loader)    : maxSessionLifetimeSeconds    (yaml tag)
+//
+// Both surfaces are camelCase, but for different reasons, so this guard's scope
+// is the Traefik one. The historical reason the spellings diverged - a
+// snake_case encoding/json surface - is gone; keep an eye on that when editing.
 //
 // WHAT THIS FILE ACTUALLY GUARDS (and what it used to miss)
 //
