@@ -1,15 +1,7 @@
 {
   "interactiveLogin": true,
   "loginPagePath": "/app/login.html",
-  "httpServer": {
-    "type": "NettyWrapper",
-    "ssl": {
-      "keyPassword": "",
-      "keystoreFile": "/certificates/mock_oidc.p12",
-      "keystoreType": "PKCS12",
-      "keystorePassword": ""
-    }
-  },
+  "httpServer": "NettyWrapper",
   "tokenCallbacks": [
     {
       "issuerId": "default",

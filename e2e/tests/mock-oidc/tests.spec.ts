@@ -23,18 +23,18 @@ ${extra}`;
  * A second plugin instance with usePkce on.
  *
  * Everything else about the e2e suite runs with usePkce: false, so before this
- * the PKCE code path had no end-to-end coverage anywhere in the repo. It lives
- * on its own PathPrefix so it cannot disturb the existing routers' traffic, and
- * as a separate middleware instance so it has its own session state.
+ * the PKCE code path had no end-to-end coverage anywhere in the repo.
+ * It gets its OWN config, written by the single test that uses it, with its own
+ * callback path so it cannot compete with the shared routers for traffic.
  *
- * Session isolation is by cookie name. configureTraefik injects the same
- * CookieNamePrefix marker into every plugin block of one write, so oidc-auth
- * and oidc-auth-pkce share a cookie name WITHIN a single config; they do not
- * share one across writes. That is safe here because test.beforeEach clears
- * cookies, so this test starts with no session and the login below is a real
- * interactive flow rather than a reuse of another router's session. It also
- * means this instance can be dropped into any config without colliding with
- * the middleware written by another call.
+ * It must NOT be added to the beforeAll config. A router matching
+ * /oidc/callback outranks the shared PathPrefix(/) whoami router by Traefik's
+ * default rule-length priority, so a shared PKCE callback router silently
+ * captures the callback of EVERY test in this file - each of which started its
+ * flow on the usePkce:false instance - and every login then lands on a
+ * middleware holding no sealed state for it. That failure reads like an IdP or
+ * network fault rather than a routing collision, which is why it must not be
+ * reintroduced here.
  */
 function pkceMiddleware(): string {
   return `
@@ -89,9 +89,6 @@ ${whoamiService()}
     oidc-auth:
       plugin:
 ${baseMiddleware()}
-    oidc-auth-pkce:
-      plugin:
-${pkceMiddleware()}
 
   routers:
     whoami:
@@ -105,23 +102,6 @@ ${pkceMiddleware()}
       rule: "PathPrefix(\`/\`)"
       service: whoami
       middlewares: ["oidc-auth@file"]
-    # Two routers on purpose. The plugin keeps the PKCE verifier in its own
-    # per-middleware state, so the callback has to come back through the SAME
-    # middleware instance that started the flow - if /oidc/callback fell
-    # through to the whoami router above it would land on the usePkce:false
-    # instance and exchange the code with no verifier at all. Traefik's default
-    # priority ranks the longer PathPrefix higher than PathPrefix(\`/\`), so the
-    # callback router wins without an explicit priority.
-    oidc-callback-pkce:
-      entryPoints: ["web"]
-      rule: "PathPrefix(\`/oidc/callback\`)"
-      service: noop@internal
-      middlewares: ["oidc-auth-pkce@file"]
-    whoami-pkce:
-      entryPoints: ["web"]
-      rule: "PathPrefix(\`/pkce\`)"
-      service: whoami
-      middlewares: ["oidc-auth-pkce@file"]
 `);
 
   await dockerCompose.upAll({
@@ -682,9 +662,9 @@ ${baseMiddleware(`
 });
 
 test('PKCE login through a dedicated usePkce router', async ({ page }) => {
-  // Rewrites the whole config rather than relying on the beforeAll one: every
-  // other test in this file replaces the config as it goes, so by the time this
-  // runs the /pkce routers from beforeAll are long gone.
+  // Writes its own complete config rather than reusing the beforeAll one. It
+  // must be complete: the shared config's routers stay as they are, and this
+  // one replaces them for as long as the test runs.
   await configureTraefik(`
 http:
 ${whoamiService()}

@@ -78,6 +78,11 @@ echo "Leaf certificate:      ${LEAF_CERT}"
 openssl pkcs12 -export -out "${CERT_DIR}/mock_oidc.p12" \
     -inkey "${LEAF_KEY}" -in "${LEAF_CERT}" -certfile "${CA_CERT}" \
     -passout pass:
+# nginx's ssl_certificate wants the leaf AND the issuing CA, so the client can
+# build a path without needing the CA from anywhere else. The plugin is given the
+# CA separately via cABundle, but sending the chain keeps the file usable by any
+# other TLS client in the suite (and keeps openssl s_client happy).
+cat "${LEAF_CERT}" "${CERT_DIR}/ca.pem" > "${CERT_DIR}/fullchain.pem"
 
 echo "PKCS12 keystore:       ${CERT_DIR}/mock_oidc.p12"
 

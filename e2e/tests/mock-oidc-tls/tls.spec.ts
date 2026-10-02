@@ -4,10 +4,16 @@
  * provider.
  *
  * This suite replaces the deleted keycloak stack. It is the same class of test
- * (an IdP whose certificate is signed by a CA that is not in any system trust
- * store) against mock-oauth2-server serving HTTPS from a PKCS12 keystore that
- * ./gencerts.sh generates, so it boots in ~3s instead of minutes and can gate
- * pull requests.
+ * (an IdP whose certificate is signed by a CA that is in no system trust store)
+ * against mock-oauth2-server behind an nginx TLS terminator, so it boots in
+ * seconds instead of minutes and can gate pull requests.
+ *
+ * TLS is terminated by nginx rather than by the mock itself. mock-oauth2-server
+ * can serve HTTPS, but when its keystore config is not picked up it silently
+ * falls back to a self-signed certificate generated at boot, whose CA nothing
+ * outside can know - and the suite then fails with "x509: certificate signed by
+ * unknown authority" while looking for a bug in the plugin. The mock's plain HTTP
+ * mode is already proven by the mock-oidc project, so only the TLS leg moved.
  */
 
 // Set at module scope, not in beforeAll: Playwright loads the spec file before
