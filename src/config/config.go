@@ -97,8 +97,15 @@ type ProviderConfig struct {
 	InsecureSkipVerify     string `json:"insecure_skip_verify" yaml:"insecureSkipVerify"`
 	InsecureSkipVerifyBool bool   `json:"insecure_skip_verify_bool" yaml:"insecureSkipVerifyBool"`
 
-	CABundle     string `json:"ca_bundle" yaml:"caBundle"`
-	CABundleFile string `json:"ca_bundle_file" yaml:"caBundleFile"`
+	// The yaml tags are the lowerCamel form of the Go field name, which is exactly what
+	// Traefik's tagless mapstructure decoder matches (case-insensitively). Any other
+	// spelling - notably "caBundle", which yaml.v3 would also accept because its field
+	// matching is case-insensitive - is silently DROPPED by the Traefik surface, and the
+	// documented remedy for a self-signed IdP is insecureSkipVerify, so a wrong spelling here
+	// pushes operators onto the weaker control. src/config_dockeys_test.go enforces the
+	// invariant over every field of every config struct.
+	CABundle     string `json:"ca_bundle" yaml:"cABundle"`
+	CABundleFile string `json:"ca_bundle_file" yaml:"cABundleFile"`
 
 	ClientId              string `json:"client_id" yaml:"clientId"`
 	ClientSecret          string `json:"client_secret" yaml:"clientSecret"`

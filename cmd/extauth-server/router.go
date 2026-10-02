@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 	"sync/atomic"
@@ -29,6 +30,35 @@ func (r *hostRouter) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 	h.ServeHTTP(rw, req)
+}
+
+// validateHostPattern rejects host patterns that can never match a real client.
+//
+// lookupHost only treats a key as a wildcard when it carries the "*." prefix, and it
+// requires the incoming host to be strictly longer than the ".suffix". So:
+//
+//   - "*" is stored under the literal key "*", matches only a request whose Host header is
+//     literally "*", which no client ever sends - it silently 403s every request including
+//     the operator's own.
+//   - "*.ab" / "*.com" are a public-suffix-wide catch: "*.com" matches every .com host in
+//     existence. There is no public-suffix list in this process, so any suffix without an
+//     inner dot is refused rather than silently widened to a whole TLD.
+//
+// Error names the offending key so the operator knows which line to delete.
+func validateHostPattern(n string) error {
+	if !strings.Contains(n, "*") {
+		return nil
+	}
+	if n == "*" {
+		return fmt.Errorf("host %q matches nothing: list the concrete hostnames, or use an explicit %q pattern", n, "*.example.com")
+	}
+	if !strings.HasPrefix(n, "*.") {
+		return fmt.Errorf("invalid wildcard host %q: a wildcard is only supported as the whole leftmost label, i.e. %q", n, "*.example.com")
+	}
+	if suffix := n[1:]; !strings.Contains(suffix[1:], ".") {
+		return fmt.Errorf("invalid wildcard host %q: the wildcard suffix must be a domain with at least two labels, i.e. %q", n, "*.example.com")
+	}
+	return nil
 }
 
 // lookupHost prefers exact Host match, then longest *.suffix wildcard.

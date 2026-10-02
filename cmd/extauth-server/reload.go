@@ -19,12 +19,14 @@ func buildHostMap(ctx context.Context, cfg *multiConfig, next http.Handler, fact
 			return nil, fmt.Errorf("client %q: %w", c.ID, err)
 		}
 		// src.New expands ${file:...} in place — enforce distinct cookie secrets after expand.
-		if c.Config.Secret != "" {
-			if prev, ok := secrets[c.Config.Secret]; ok {
-				return nil, fmt.Errorf("duplicate secret after expand for clients %q and %q", prev, c.ID)
-			}
-			secrets[c.Config.Secret] = c.ID
+		// Unconditional, including an empty expanded secret: a ${file:...} ref that expands
+		// to "" (or to a file that does not exist, since expansion is best-effort) must not
+		// slip past the uniqueness invariant, and the strictness must match the pre-expansion
+		// check in validateMultiConfig so both surfaces enforce the same rule.
+		if prev, ok := secrets[c.Config.Secret]; ok {
+			return nil, fmt.Errorf("duplicate secret after expand for clients %q and %q", prev, c.ID)
 		}
+		secrets[c.Config.Secret] = c.ID
 		for _, host := range c.Hosts {
 			out[normalizeHost(host)] = h
 		}

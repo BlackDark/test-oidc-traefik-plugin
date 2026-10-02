@@ -116,3 +116,49 @@ func TestHostRouter_SwapAtomic(t *testing.T) {
 		t.Fatalf("status=%d want 418 after swap", rw.Code)
 	}
 }
+
+// Finding 6: a fully-qualified Host ("a.example.com.", RFC 1035 5.1) is the same host as the
+// relative spelling, and some clients send the dotted form. normalizeHost strips the dot on
+// BOTH sides, so an exact tenant and a wildcard tenant must both match with and without it.
+func TestLookupHost_TrailingDot(t *testing.T) {
+	ok := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {})
+	m := map[string]http.Handler{
+		"tenant-a.example.com": ok,
+		"*.wild.example.com":   ok,
+	}
+	for _, host := range []string{
+		"tenant-a.example.com",
+		"tenant-a.example.com.",
+		"TENANT-A.EXAMPLE.COM.:8443",
+		"sub.wild.example.com",
+		"sub.wild.example.com.",
+		"xn--80ak6aa92e.com.", // never matches: different tenant, proves the dot is not the reason
+	} {
+		h, matched := lookupHost(m, host)
+		if host == "xn--80ak6aa92e.com." {
+			if matched {
+				t.Fatalf("lookupHost(%q) matched an unrelated host", host)
+			}
+			continue
+		}
+		if !matched || h == nil {
+			t.Errorf("lookupHost(%q) did not match; a trailing FQDN dot must be ignored", host)
+		}
+	}
+}
+
+// The exact match must still win over the wildcard when the request carries a trailing dot.
+func TestHostRouter_TrailingDotPrefersExact(t *testing.T) {
+	r := newHostRouter()
+	r.swap(map[string]http.Handler{
+		"grafana.example.com": http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) { w.WriteHeader(http.StatusOK) }),
+		"*.example.com":       http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) { w.WriteHeader(http.StatusAccepted) }),
+	})
+	rw := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "http://grafana.example.com/", nil)
+	req.Host = "grafana.example.com.:443"
+	r.ServeHTTP(rw, req)
+	if rw.Code != http.StatusOK {
+		t.Fatalf("code=%d want 200 from the exact tenant, not the wildcard", rw.Code)
+	}
+}

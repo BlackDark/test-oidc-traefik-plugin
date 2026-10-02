@@ -10,7 +10,7 @@ Source: `cmd/extauth-server/`.
 CONFIG_FILE=./config.yaml LISTEN_ADDR=:9002 GRPC_LISTEN_ADDR=:9003 go run ./cmd/extauth-server
 ```
 
-- `CONFIG_FILE` — path to a **YAML** multi-client config (default `config.yaml`), see [Multi-client config](#multi-client-config) below. **Breaking:** the single-client JSON config is no longer supported; the process now always serves a `clients[]` map. Each entry carries the **same fields** as `.traefik.yml`'s `testData` / Traefik's dynamic plugin config (see `src/config/config.go` for all of them) under **camelCase YAML keys** — the same spelling Traefik itself uses, because both surfaces match the **Go field name** (see the casing note below). Values support `${VAR}` and `${file:/path}` expansion (same as Traefik).
+- `CONFIG_FILE` — path to a **YAML** multi-client config (default `config.yaml`), see [Multi-client config](#multi-client-config) below. **Breaking:** the single-client JSON config is no longer supported; the process now always serves a `clients[]` map. Each entry carries the **same fields** as `.traefik.yml`'s `testData` / Traefik's dynamic plugin config (see `src/config/config.go` for all of them) under **camelCase YAML keys** — the same spelling Traefik itself uses, because both surfaces match the **Go field name** (see the casing note below). Values support `${VAR}` and `${file:/path}` expansion (same as Traefik). The two CA-bundle keys are `provider.cABundle` and `provider.cABundleFile` (note the initialism's capitals).
 - `LISTEN_ADDR` — HTTP mode listener. Default `:9002`.
 - `GRPC_LISTEN_ADDR` — gRPC mode listener. Unset by default (gRPC server does not start unless set).
 - `SECRET_WATCH_DIRS` — optional comma-separated directories to watch (in addition to the config file's directory). Use for mounted Secret volumes so `${file:…}` rotations trigger reload.
@@ -20,7 +20,7 @@ Both modes can run simultaneously against the same Host→client map — pick wh
 
 ## Multi-client config
 
-One process serves many OIDC clients keyed by **Host** (exact, case-insensitive; port stripped; optional `*.suffix` wildcards, exact wins). Unknown Host → **403**.
+One process serves many OIDC clients keyed by **Host** (exact, case-insensitive; port and one trailing FQDN dot stripped; `*.suffix` wildcards with a two-label-or-more suffix, exact wins). Unknown Host → **403**.
 
 ```yaml
 clients:
@@ -49,11 +49,13 @@ clients:
 Rules:
 
 - `clients` required, ≥1 entry
-- Unique `id`, unique normalized hosts across clients, unique `cookieNamePrefix`, unique cookie `secret` (raw and after `${…}` expand)
+- Unique `id`, unique normalized hosts across clients, unique `cookieNamePrefix`, unique cookie `secret` — the uniqueness checks are **unconditional**, so two clients sharing `secret: ""` or the built-in default are rejected too, not just two clients sharing a real value.
+- Hosts are normalized (lowercased, port stripped, one trailing FQDN dot stripped) and must be exact names or a whole-leftmost-label `*.suffix` wildcard whose suffix has at least two labels. A bare `*`, a `*.com`-style suffix, and a wildcard anywhere but the leftmost label are **rejected by name** at load: they match nothing (bare `*`) or silently widen to a whole public suffix (`*.com`, which this process has no public-suffix list for).
+- A sub-struct explicitly set to YAML `null` (`sessionCookie:`, `authorization:`, `errorPages:`, `errorPages.unauthenticated:`, `errorPages.unauthorized:`, `authorizationHeader:`, `authorizationCookie:`, `provider:`) is **rejected with an error naming the field**, not re-defaulted. `src.New` dereferences these unconditionally, so a `null` used to panic the process; and quietly re-defaulting would contradict what the operator wrote (e.g. `authorization: null` becoming "no claim assertions"). Omit the key to get its defaults.
 - No top-level shared provider/secret — everything per client
 - Values support `${VAR}` and `${file:/path}` expansion (same as Traefik plugin)
 
-**Reload:** file watch (debounced) on the config directory + `SECRET_WATCH_DIRS`, and `SIGHUP`. Bad reload keeps the previous map; bad boot exits 1.
+**Reload:** file watch (debounced) on the config directory + `SECRET_WATCH_DIRS`, and `SIGHUP`. Bad reload keeps the previous map; bad boot exits 1. "Bad" includes **panicking**: the reload body runs under a `recover()` that logs the panic with a stack trace and keeps the previous map, so a config that triggers a bug in `src.New` can never take every tenant of the process down.
 
 **K8s tip:** ConfigMap for the YAML; Secret volume for files under `/secrets/<id>/…`. Prefer `${file:…}` over env for secrets.
 
@@ -61,14 +63,16 @@ Rules:
 
 ### Casing: why `CONFIG_FILE` keys are camelCase
 
-`CONFIG_FILE` is decoded with `gopkg.in/yaml.v3` against the `yaml` struct tags in `src/config/config.go`, which the multi-client config sets to the **Go field name**. That is deliberately the same spelling **Traefik** uses: Traefik decodes the plugin config with `mapstructure` and **no `TagName`**, so it matches the Go field name case-insensitively and ignores the `json` tags entirely. One spelling therefore serves both surfaces — `clientId`, `callbackUri`, `maxSessionLifetimeSeconds`, `trustedProxies`, `authorizationParams`, `authorizationParamsOverridable`, `provider.maxAuthAgeSeconds`, `provider.oidcTimeoutSeconds`.
+`CONFIG_FILE` is decoded with `gopkg.in/yaml.v3` against the `yaml` struct tags in `src/config/config.go`, which the multi-client config sets to the **Go field name**. That is deliberately the same spelling **Traefik** uses: Traefik decodes the plugin config with `mapstructure` and **no `TagName`**, so it matches the Go field name case-insensitively and ignores the `json` tags entirely. One spelling therefore serves both surfaces — `clientId`, `callbackUri`, `maxSessionLifetimeSeconds`, `trustedProxies`, `authorizationParams`, `authorizationParamsOverridable`, `provider.maxAuthAgeSeconds`, `provider.oidcTimeoutSeconds`, `provider.cABundle`, `provider.cABundleFile`.
 
-The snake_case `json` tags (eg. `log_level`, `callback_uri`, `provider.client_id`) are **not** valid `CONFIG_FILE` keys. They are decoded only on the historical single-client JSON path, which this release removed. See the casing table in [`website/docs/getting-started/middleware-configuration.md`](../website/docs/getting-started/middleware-configuration.md#plugin-config-block) for the full list.
+The yaml tags are **required** to be the lowerCamel form of the Go field name, and `TestTraefikConfigKeys/YamlTagsAreTheLowerCamelGoFieldName` in `src/config_dockeys_test.go` enforces that over every field of every config struct. This matters because yaml.v3 matches struct fields case-insensitively, so a wrong tag (e.g. `caBundle` for `CABundle`) binds here and looks fine, while Traefik's tagless mapstructure drops it with no error — and the documented remedy for a CA bundle that did not load is `insecureSkipVerify`, i.e. a wrong tag silently pushes operators onto the weaker control. Note the Go field names `CABundle`/`CABundleFile` take the initialism's capitals: the camelCase key is **`cABundle`**, not `caBundle`.
+
+The snake_case `json` tags (eg. `log_level`, `callback_uri`, `provider.client_id`) are **not** valid `CONFIG_FILE` keys. They are decoded only on the historical single-client JSON path, which this release removed. See the casing note in [`website/docs/getting-started/middleware-configuration.md`](../website/docs/getting-started/middleware-configuration.md#plugin-config-block).
 
 :::note Boolean provider options work under either name in YAML
 The `bool`-typed provider options (`usePkce`, `validateAudience`, `validateIssuer`, `validateNonce`, `useClaimsFromUserInfo`, `insecureSkipVerify`, and `revokeTokensOnLogout`) are declared in Go as a **string** field plus a separate `bool` field carrying the `Bool` suffix — see `RevokeTokensOnLogout string` / `RevokeTokensOnLogoutBool bool` in `src/config/config.go`. The **string** field exists only to serve Traefik's weakly-typed `mapstructure` decoder and `${VAR}` expansion; `src.New` then expands it into the `bool` field with `ExpandEnvironmentVariableBoolean`, which accepts `true`/`false`/`1`/`0`.
 
-In YAML both spellings therefore work and mean the same thing: `revokeTokensOnLogout: true` (a native YAML boolean) is accepted by the string field, and `revokeTokensOnLogoutBool: true` sets the boolean directly. The string form additionally supports `"${FLAG}"` env expansion. This differs from the removed JSON path, where the strictly-typed decoder required the `_bool` key.
+In YAML both spellings therefore work and mean the same thing: `revokeTokensOnLogout: true` (a native YAML boolean) is accepted by the string field, and `revokeTokensOnLogoutBool: true` sets the boolean directly. The string form additionally supports `"${FLAG}"` env expansion. (The removed single-client JSON path was strictly typed and required the `_bool` key; there is no such requirement on the YAML surface.)
 :::
 
 :::note There is no `trustedProxies` in this example on purpose

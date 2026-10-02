@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"runtime/debug"
 	"strings"
 	"sync"
 	"syscall"
@@ -143,6 +144,21 @@ func configFilePath() string {
 func doReload(ctx context.Context, mu *sync.Mutex, r *hostRouter, path string, next http.Handler, factory handlerFactory) {
 	mu.Lock()
 	defer mu.Unlock()
+
+	// The documented promise is "bad reload keeps the previous map". That promise has to hold
+	// for a PANIC too, not only for a returned error: doReload runs on a time.AfterFunc
+	// goroutine, and an unrecovered panic there terminates the whole process, taking down
+	// every tenant of this multi-client server, not just the client whose config was bad.
+	// (This was reachable with `sessionCookie: null`, which decoded to a nil pointer that
+	// src.New dereferenced.) recover here turns any such future bug into a logged, ignored
+	// reload; the previous map keeps serving because the swap only happens after a
+	// successful buildHostMap.
+	defer func() {
+		if rec := recover(); rec != nil {
+			log.Printf("extauth-server: reload panicked (keeping previous config): %v\n%s", rec, debug.Stack())
+		}
+	}()
+
 	if err := reloadFromFile(ctx, r, path, next, factory); err != nil {
 		log.Printf("extauth-server: reload failed (keeping previous config): %v", err)
 		return
