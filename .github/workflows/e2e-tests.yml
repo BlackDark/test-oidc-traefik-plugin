@@ -59,9 +59,37 @@ jobs:
         run: bunx playwright install --with-deps chromium
 
       - name: Run Playwright tests
-        run: bunx playwright test --project=mock-oidc
+        run: |
+          set -o pipefail
+          bunx playwright test --project=mock-oidc 2>&1 | tee /tmp/pw.log
         env:
           CI: true
+
+      # Job logs can only be fetched with admin rights, and the step log is
+      # truncated, so a red run has historically been undiagnosable from outside.
+      # GitHub turns ::error:: lines into check annotations, which ARE readable
+      # from the public API, so publish the useful part of a failure there.
+      # Deliberately last so it also covers a beforeAll that never ran.
+      - name: Publish failure detail as annotations
+        if: ${{ failure() }}
+        run: |
+          set -uo pipefail
+          emit() {
+            # Workflow commands are line delimited and treat % and CR as
+            # escapes, so neutralise both before emitting.
+            printf '%s\n' "$1" | tr -d '\r' | sed 's/%/%25/g' | head -c 900 |
+              sed 's/^/::error::/'
+          }
+          if [ ! -f /tmp/pw.log ]; then
+            emit "Playwright produced no output: the failure was before the test runner (fixture, compose up, or image build)."
+            exit 0
+          fi
+          emit "=== failed test names ==="
+          grep -E '^[[:space:]]+[0-9]+\) ' /tmp/pw.log | head -25 | while IFS= read -r l; do emit "$l"; done
+          emit "=== playwright summary ==="
+          grep -E '^[[:space:]]+[0-9]+ (failed|passed|flaky|skipped|did not run)' /tmp/pw.log | head -10 | while IFS= read -r l; do emit "$l"; done
+          emit "=== error headlines ==="
+          grep -E 'Error:|Timed out|expect\(|received:|Expected' /tmp/pw.log | head -25 | while IFS= read -r l; do emit "$l"; done
 
       - name: Upload Playwright report
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -117,9 +145,37 @@ jobs:
 
       - name: Run Playwright tests
         id: playwright
-        run: bunx playwright test --project=mock-oidc-tls
+        run: |
+          set -o pipefail
+          bunx playwright test --project=mock-oidc-tls 2>&1 | tee /tmp/pw.log
         env:
           CI: true
+
+      # Job logs can only be fetched with admin rights, and the step log is
+      # truncated, so a red run has historically been undiagnosable from outside.
+      # GitHub turns ::error:: lines into check annotations, which ARE readable
+      # from the public API, so publish the useful part of a failure there.
+      # Deliberately last so it also covers a beforeAll that never ran.
+      - name: Publish failure detail as annotations
+        if: ${{ failure() }}
+        run: |
+          set -uo pipefail
+          emit() {
+            # Workflow commands are line delimited and treat % and CR as
+            # escapes, so neutralise both before emitting.
+            printf '%s\n' "$1" | tr -d '\r' | sed 's/%/%25/g' | head -c 900 |
+              sed 's/^/::error::/'
+          }
+          if [ ! -f /tmp/pw.log ]; then
+            emit "Playwright produced no output: the failure was before the test runner (fixture, compose up, or image build)."
+            exit 0
+          fi
+          emit "=== failed test names ==="
+          grep -E '^[[:space:]]+[0-9]+\) ' /tmp/pw.log | head -25 | while IFS= read -r l; do emit "$l"; done
+          emit "=== playwright summary ==="
+          grep -E '^[[:space:]]+[0-9]+ (failed|passed|flaky|skipped|did not run)' /tmp/pw.log | head -10 | while IFS= read -r l; do emit "$l"; done
+          emit "=== error headlines ==="
+          grep -E 'Error:|Timed out|expect\(|received:|Expected' /tmp/pw.log | head -25 | while IFS= read -r l; do emit "$l"; done
 
       # The spec's afterEach dumps traefik + mock logs, but afterEach does NOT
       # run when beforeAll itself fails (compose never came up) - which is
