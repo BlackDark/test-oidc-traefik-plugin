@@ -23,6 +23,7 @@
 // only covers the browser, not Node.
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
+import { X509Certificate } from 'node:crypto';
 import fs from 'node:fs';
 import https from 'node:https';
 import path from 'node:path';
@@ -299,31 +300,77 @@ async function waitForFailedRequest(timeoutMs = 30_000): Promise<number> {
  * two CI runs. It is an assertion, not a log line: if this passes and the login
  * still fails, the fault is unambiguously on the plugin-config side.
  */
-async function expectServedCertFromOurCa(): Promise<void> {
-  const peer = await new Promise<{ subject: unknown; issuer: unknown }>((resolve, reject) => {
+async function peerCertificate(): Promise<X509Certificate> {
+  return new Promise((resolve, reject) => {
     const req = https.request(
       { host: '127.0.0.1', port: 8443, path: '/isalive', rejectUnauthorized: false },
       (res) => {
         res.resume();
-        resolve(res.socket.getPeerCertificate());
+        const peer = res.socket.getPeerCertificate();
+        if (!peer || Object.keys(peer).length === 0) {
+          reject(new Error('the TLS terminator presented no certificate'));
+          return;
+        }
+        resolve(peer);
       },
     );
     req.on('error', reject);
     req.end();
   });
+}
 
-  const issuer = peer.issuer as { CN?: string } | undefined;
-  const subject = peer.subject as { CN?: string } | undefined;
-  const issuerCN = issuer?.CN ?? JSON.stringify(issuer);
-  const subjectCN = subject?.CN ?? JSON.stringify(subject);
+/**
+ * Prove the TLS terminator is serving the exact leaf gencerts.sh signed, and
+ * that a client trusting our CA can complete the plugin's discovery call.
+ *
+ * This exists because "x509: certificate signed by unknown authority" has three
+ * indistinguishable causes - the terminator serves a different certificate, the
+ * pool we hand the plugin cannot verify that certificate, or the plugin is not
+ * using the pool we think it is - and choosing between them from the failure
+ * message alone already cost two CI runs. Comparing fingerprints settles the
+ * first question outright; performing the discovery request with only our CA
+ * trusted settles the second. If both pass and the plugin still fails, the
+ * fault is unambiguously inside the plugin's TLS setup rather than in the
+ * fixture.
+ */
+async function expectServedCertFromOurCa(): Promise<void> {
+  const expected = new X509Certificate(fs.readFileSync(path.join(CERT_DIR, 'website.pem')));
+  const peer = await peerCertificate();
 
   expect(
-    issuerCN,
-    `the TLS terminator served a certificate issued by "${issuerCN}" (subject "${subjectCN}"), ` +
-      `but gencerts.sh signs the leaf with "${CA_COMMON_NAME}". Either the certificates ` +
-      `directory was not generated for this run, or the terminator is not the one serving 8443.`,
-  ).toBe(CA_COMMON_NAME);
-  expect(subjectCN).toBe('localhost');
+    peer.fingerprint256,
+    `the TLS terminator served a different certificate than certificates/website.pem ` +
+      `(served ${peer.fingerprint256}, generated ${expected.fingerprint256}). Either the ` +
+      `certificates directory is stale for this run, or something else is bound to port 8443.`,
+  ).toBe(expected.fingerprint256);
+
+  expect((peer.issuer as { CN?: string } | undefined)?.CN).toBe(CA_COMMON_NAME);
+
+  // The discovery call the plugin makes, with nothing but our CA trusted - the
+  // same trust decision cABundle makes on the plugin's behalf.
+  const caPem = fs.readFileSync(path.join(CERT_DIR, 'ca.pem'));
+  const discovery = await new Promise<number>((resolve) => {
+    const req = https.request(
+      {
+        host: '127.0.0.1',
+        port: 8443,
+        path: '/default/.well-known/openid-configuration',
+        ca: [caPem],
+        servername: 'localhost',
+      },
+      (res) => {
+        res.resume();
+        resolve(res.statusCode ?? 0);
+      },
+    );
+    req.on('error', () => resolve(-1));
+    req.end();
+  });
+  expect(
+    discovery,
+    `a client trusting only our CA could not complete the discovery request (status ${discovery}). ` +
+      `The certificate chain itself is therefore broken, independent of the plugin.`,
+  ).toBe(200);
 }
 
 async function login(page: Page, username: string, password: string, waitForUrl: string) {
