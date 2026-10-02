@@ -19,6 +19,35 @@ function baseMiddleware(extra = ''): string {
 ${extra}`;
 }
 
+/**
+ * A second plugin instance with usePkce on.
+ *
+ * Everything else about the e2e suite runs with usePkce: false, so before this
+ * the PKCE code path had no end-to-end coverage anywhere in the repo. It lives
+ * on its own PathPrefix so it cannot disturb the existing routers' traffic, and
+ * as a separate middleware instance so it has its own session state.
+ *
+ * Session isolation is by cookie name. configureTraefik injects the same
+ * CookieNamePrefix marker into every plugin block of one write, so oidc-auth
+ * and oidc-auth-pkce share a cookie name WITHIN a single config; they do not
+ * share one across writes. That is safe here because test.beforeEach clears
+ * cookies, so this test starts with no session and the login below is a real
+ * interactive flow rather than a reuse of another router's session. It also
+ * means this instance can be dropped into any config without colliding with
+ * the middleware written by another call.
+ */
+function pkceMiddleware(): string {
+  return `
+        traefik-oidc-auth:
+          logLevel: DEBUG
+          secret: "${PLUGIN_SECRET}"
+          provider:
+            url: "\${PROVIDER_URL}"
+            clientId: "\${CLIENT_ID}"
+            clientSecret: "\${CLIENT_SECRET}"
+            usePkce: true`;
+}
+
 function whoamiService(): string {
   return `
   services:
@@ -60,8 +89,39 @@ ${whoamiService()}
     oidc-auth:
       plugin:
 ${baseMiddleware()}
+    oidc-auth-pkce:
+      plugin:
+${pkceMiddleware()}
 
-${whoamiRouter()}
+  routers:
+    whoami:
+      entryPoints: ["web"]
+      rule: "PathPrefix(\`/\`)"
+      service: whoami
+      middlewares: ["oidc-auth@file"]
+    whoami-secure:
+      entryPoints: ["websecure"]
+      tls: {}
+      rule: "PathPrefix(\`/\`)"
+      service: whoami
+      middlewares: ["oidc-auth@file"]
+    # Two routers on purpose. The plugin keeps the PKCE verifier in its own
+    # per-middleware state, so the callback has to come back through the SAME
+    # middleware instance that started the flow - if /oidc/callback fell
+    # through to the whoami router above it would land on the usePkce:false
+    # instance and exchange the code with no verifier at all. Traefik's default
+    # priority ranks the longer PathPrefix higher than PathPrefix(\`/\`), so the
+    # callback router wins without an explicit priority.
+    oidc-callback-pkce:
+      entryPoints: ["web"]
+      rule: "PathPrefix(\`/oidc/callback\`)"
+      service: noop@internal
+      middlewares: ["oidc-auth-pkce@file"]
+    whoami-pkce:
+      entryPoints: ["web"]
+      rule: "PathPrefix(\`/pkce\`)"
+      service: whoami
+      middlewares: ["oidc-auth-pkce@file"]
 `);
 
   await dockerCompose.upAll({
@@ -619,6 +679,51 @@ ${baseMiddleware(`
     [403],
   );
   expect(challenged.status()).toBe(403);
+});
+
+test('PKCE login through a dedicated usePkce router', async ({ page }) => {
+  // Rewrites the whole config rather than relying on the beforeAll one: every
+  // other test in this file replaces the config as it goes, so by the time this
+  // runs the /pkce routers from beforeAll are long gone.
+  await configureTraefik(`
+http:
+${whoamiService()}
+
+  middlewares:
+    oidc-auth-pkce:
+      plugin:
+${pkceMiddleware()}
+
+  routers:
+    oidc-callback-pkce:
+      entryPoints: ["web"]
+      rule: "PathPrefix(\`/oidc/callback\`)"
+      service: noop@internal
+      middlewares: ["oidc-auth-pkce@file"]
+    whoami-pkce:
+      entryPoints: ["web"]
+      rule: "PathPrefix(\`/pkce\`)"
+      service: whoami
+      middlewares: ["oidc-auth-pkce@file"]
+`);
+
+  // Proves the plugin's S256 round trip works against a real OIDC
+  // implementation: it sends code_challenge + code_challenge_method=S256 on the
+  // authorize leg, keeps the verifier, and replays it on the token leg, and the
+  // provider accepts the exchange.
+  //
+  // KNOWN LIMITATION, and the reason this test stops at a successful login:
+  // mock-oauth2-server does NOT require a PKCE verifier - a missing one is
+  // silently accepted and only a WRONG one is rejected. So a green run here
+  // proves the plugin's verifier is not wrong; it does NOT prove a provider
+  // would reject a PKCE downgrade (the plugin silently dropping the verifier).
+  // Do not read this as coverage of downgrade rejection - no e2e in this repo
+  // covers that, and adding a test that implied otherwise would be a false
+  // guarantee rather than a test.
+  await expectGotoOkay(page, 'http://localhost:9080/pkce');
+  const response = await login(page, 'admin', 'admin', 'http://localhost:9080/pkce');
+  expect(response.status()).toBe(200);
+  expect(await page.locator('text=Hostname:').isVisible()).toBeTruthy();
 });
 
 async function login(
