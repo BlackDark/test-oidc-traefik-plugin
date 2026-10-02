@@ -186,7 +186,19 @@ async function waitForAuthorizeRedirect(url = `${HTTP_URL}/`, timeoutMs = 30_000
   let last = 'never attempted';
   while (Date.now() < deadline) {
     try {
-      const res = await fetch(url, { redirect: 'manual', signal: AbortSignal.timeout(5_000) });
+      // Accept: text/html matters and is easy to miss. The default
+      // unauthenticatedBehavior is "Auto", which content-negotiates: a browser
+      // asking for HTML gets redirected to the IdP, anything else gets a bare
+      // 401. Node's fetch sends `Accept: */*`, so without this header the plugin
+      // correctly answers 401 and this helper waits forever for a redirect that
+      // this client is not entitled to. Asking the way a browser asks is also
+      // the more honest assertion - it is the same request the test's own
+      // page.goto below will make.
+      const res = await fetch(url, {
+        redirect: 'manual',
+        signal: AbortSignal.timeout(5_000),
+        headers: { accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8' },
+      });
       const location = res.headers.get('location') ?? '';
       if (res.status >= 300 && res.status < 400 && location.includes(AUTHORIZE_PATH)) {
         return location;
@@ -469,9 +481,18 @@ test('T2 inline base64 cABundle behaves identically to cABundleFile', async ({ p
   // between the two config forms - the authorize redirect the plugin emitted
   // can. So the cABundleFile form is measured here too and the two targets are
   // compared directly.
+  // Write BOTH forms here rather than inheriting one from the ambient config.
+  // Measuring the file form from whatever config happens to be loaded makes this
+  // test order-dependent: run on its own with -g, or after a failed T1, the
+  // "file" measurement is really measuring a config with no CA bundle at all and
+  // the equivalence assertion compares two failures.
+  await writeConfig(
+    oidcConfig(`
+            cABundleFile: "/certificates/ca.pem"`),
+  );
   const fileTarget = authorizeTarget(await waitForAuthorizeRedirect());
-  const bundle = fs.readFileSync(path.join(CERT_DIR, 'ca.pem')).toString('base64');
 
+  const bundle = fs.readFileSync(path.join(CERT_DIR, 'ca.pem')).toString('base64');
   await writeConfig(
     oidcConfig(`
             cABundle: "base64:${bundle}"`),
