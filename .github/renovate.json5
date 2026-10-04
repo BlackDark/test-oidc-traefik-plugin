@@ -1,20 +1,13 @@
 {
   $schema: "https://docs.renovatebot.com/renovate-schema.json",
-  // Everything shared (best practices, digest/action pinning, automerge below major,
-  // monthly schedule, dep grouping) lives in renovate-base. Only what is specific to
-  // this repo belongs here.
   extends: ["github>blackdark/renovate-base//default.json5", ":pinVersions"],
   postUpdateOptions: ["gomodTidy"],
-  // Automerge from the base preset is only as safe as the gate it waits on. These merges
-  // are held until main reports green, and testing.yaml fails a PR whose go.mod drifted
-  // from vendor/modules.txt ("inconsistent vendoring"). That only holds while the Go
-  // checks are required status checks on main - see docs/renovate.md.
+  // Automerge waits on required status checks; see docs/renovate.md.
   automergeType: "pr",
-  // Vendored deps are refreshed by `task vendor` in the same PR, never by Renovate itself.
+  // Refreshed by `task vendor`, which Renovate cannot run.
   ignorePaths: ["**/node_modules/**", "**/vendor/**"],
   packageRules: [
-    // The base preset groups by npm dep type, which does not exist for Go modules, so
-    // Go bumps would arrive one PR per dependency. Group them by bump level instead.
+    // The base groups by npm depType, which Go modules do not have.
     {
       matchManagers: ["gomod", "golang-version"],
       matchUpdateTypes: ["minor", "patch", "pin"],
@@ -29,16 +22,14 @@
     },
   ],
   customManagers: [
-    // `image:` pins in the local IdP playground compose files are real dependencies but
-    // live in no manifest, so the built-in docker managers never see them.
+    // Compose-file `image:` pins that no manifest manager sees. The validator requires
+    // both a depName and a currentValue group.
     {
       customType: "regex",
       managerFilePatterns: [
         "/^workspaces\\/.*\\.ya?ml$/",
         "/^e2e\\/tests\\/.*docker-compose\\.ya?ml$/",
       ],
-      // Both groups are required: depName is the image repo, currentValue the tag. A
-      // regex manager yielding only depName (or only currentValue) is rejected outright.
       matchStrings: ["image:\\s*[\"']?(?<depName>[\\w./-]+):(?<currentValue>[\\w.-]+)[\"']?"],
       datasourceTemplate: "docker",
     },
