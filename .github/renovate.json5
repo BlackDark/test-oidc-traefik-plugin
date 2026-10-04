@@ -2,7 +2,6 @@
   $schema: "https://docs.renovatebot.com/renovate-schema.json",
   extends: ["github>blackdark/renovate-base//default.json5", ":pinVersions"],
   postUpdateOptions: ["gomodTidy"],
-  // Automerge waits on required status checks; see docs/renovate.md.
   automergeType: "pr",
   // Refreshed by `task vendor`, which Renovate cannot run.
   ignorePaths: ["**/node_modules/**", "**/vendor/**"],
