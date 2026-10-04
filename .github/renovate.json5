@@ -6,6 +6,11 @@
   extends: [
     "config:best-practices",
     "customManagers:githubActionsVersions",
+    // patch + minor + pin + lockfile maintenance, never major.
+    ":automergeMinor",
+    // config:best-practices pins digests, so digest bumps must automerge too or every
+    // pinned image turns into a hand-reviewed PR.
+    ":automergeDigest",
     "schedule:weekly",
     ":dependencyDashboard",
     ":prConcurrentLimitNone",
@@ -15,6 +20,12 @@
   // Vendored deps are refreshed by `task vendor` in the same PR, never by Renovate itself.
   ignorePaths: ["**/node_modules/**", "**/vendor/**"],
   labels: ["dependencies"],
+  // Automerge is only as safe as the gate it waits on: these merges are held until
+  // `main` reports green, and testing.yaml fails a PR whose go.mod drifted from
+  // vendor/modules.txt ("inconsistent vendoring"). That only holds while
+  // `go test -count=1 -race ./...` is a required status check on main - see
+  // docs/renovate.md.
+  automergeType: "pr",
   // Lockfile maintenance comes from :maintainLockFilesWeekly in config:best-practices.
   // go.sum is refreshed by Renovate, but the vendored tree is not: it has to come from
   // `task vendor`, so those PRs are flagged for the reviewer instead of silently merged.
@@ -53,7 +64,6 @@
       matchUpdateTypes: ["patch", "minor", "pin", "digest"],
       groupName: "js non-major",
       groupSlug: "js-non-major",
-      addLabels: ["automerge"],
     },
     {
       matchManagers: ["bun"],
