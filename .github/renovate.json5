@@ -1,0 +1,74 @@
+{
+  $schema: "https://docs.renovatebot.com/renovate-schema.json",
+  extends: [
+    "config:recommended",
+    "customManagers:githubActionsVersions",
+    "helpers:pinGitHubActionDigests",
+    "schedule:weekly",
+    ":dependencyDashboard",
+    ":prConcurrentLimitNone",
+    ":prHourlyLimitNone",
+    ":semanticCommits",
+  ],
+  // Vendored deps are refreshed by `task vendor` in the same PR, never by Renovate itself.
+  ignorePaths: ["**/node_modules/**", "**/vendor/**"],
+  labels: ["dependencies"],
+  lockFileMaintenance: { enabled: true },
+  // go.sum is refreshed by Renovate, but the vendored tree is not: it has to come from
+  // `task vendor`, so those PRs are flagged for the reviewer instead of silently merged.
+  postUpdateOptions: ["gomodTidy"],
+  packageRules: [
+    // No automerge for Go: the repo builds from vendor/, which Renovate ignores. A merged
+    // go.mod/go.sum bump without a matching `task vendor` run leaves vendor/ stale and
+    // breaks the build, so Go bumps stay review-required PRs.
+    // One PR per bump level keeps diffs reviewable; majors are grouped separately because
+    // they routinely need code changes.
+    {
+      matchManagers: ["gomod", "golang-version"],
+      matchUpdateTypes: ["minor", "patch", "pin"],
+      groupName: "go modules (non-major)",
+      groupSlug: "go-modules-non-major",
+    },
+    {
+      matchManagers: ["gomod", "golang-version"],
+      matchUpdateTypes: ["major"],
+      groupName: "go modules (major)",
+      groupSlug: "go-modules-major",
+    },
+    {
+      matchDatasources: ["docker"],
+      matchFileNames: [
+        "**/Dockerfile",
+        "**/compose*.ya?ml",
+        "**/docker-compose*.ya?ml",
+      ],
+      groupName: "docker images",
+      groupSlug: "docker",
+      addLabels: ["docker"],
+    },
+    {
+      matchManagers: ["bun"],
+      matchUpdateTypes: ["patch", "minor", "pin", "digest"],
+      groupName: "js non-major",
+      groupSlug: "js-non-major",
+      addLabels: ["automerge"],
+    },
+    {
+      matchManagers: ["bun"],
+      matchUpdateTypes: ["major"],
+      groupName: "js major",
+      groupSlug: "js-major",
+    },
+  ],
+  regexManagers: [
+    // `version:`/`image:` pins in the local IdP playground compose files and the Traefik
+    // lab configs are real dependencies but live in no manifest, so the built-in managers
+    // never see them.
+    {
+      fileMatch: ["^workspaces/.*\\.ya?ml$", "^e2e/tests/.*docker-compose\\.ya?ml$"],
+      matchStrings: ["image:\\s*[\"']?(?<dep>[\\w./-]+:[\\w.-]+)[\"']?"],
+      datasourceTemplate: "docker",
+      depNameTemplate: "{{{ dep }}}",
+    },
+  ],
+}
