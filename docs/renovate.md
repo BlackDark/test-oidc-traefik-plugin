@@ -31,7 +31,6 @@ and pushes. Expect automerge to no-op on Go bumps until that loop closes.
 
 ## Dependabot
 
-Disabled via repository settings: `Security > Dependabot alerts` and
-`Security updates` are both off, which stops PRs regardless of
-`.github/dependabot.yml`. Removing that file is still worth doing so the tree
-matches the intent, and so re-enabling settings later does not silently revive it.
+Replaced by Renovate; `.github/dependabot.yml` is removed. `Security > Dependabot
+alerts` and `Security updates` are also off in repository settings, so re-enabling
+those later will not silently revive Dependabot PRs.
