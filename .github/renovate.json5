@@ -1,41 +1,20 @@
 {
   $schema: "https://docs.renovatebot.com/renovate-schema.json",
-  // Superset of config:recommended: pins docker digests + action digests, weekly lockfile
-  // maintenance, abandoned-dep detection, and :configMigration (which will rename this
-  // file to renovate.json - JSON5 config files are deprecated).
-  extends: [
-    "config:best-practices",
-    "customManagers:githubActionsVersions",
-    // patch + minor + pin + lockfile maintenance, never major.
-    ":automergeMinor",
-    // config:best-practices pins digests, so digest bumps must automerge too or every
-    // pinned image turns into a hand-reviewed PR.
-    ":automergeDigest",
-    "schedule:weekly",
-    ":dependencyDashboard",
-    ":prConcurrentLimitNone",
-    ":prHourlyLimitNone",
-    ":semanticCommits",
-  ],
+  // Everything shared (best practices, digest/action pinning, automerge below major,
+  // monthly schedule, dep grouping) lives in renovate-base. Only what is specific to
+  // this repo belongs here.
+  extends: ["github>blackdark/renovate-base//default.json5", ":pinVersions"],
+  postUpdateOptions: ["gomodTidy"],
+  // Automerge from the base preset is only as safe as the gate it waits on. These merges
+  // are held until main reports green, and testing.yaml fails a PR whose go.mod drifted
+  // from vendor/modules.txt ("inconsistent vendoring"). That only holds while the Go
+  // checks are required status checks on main - see docs/renovate.md.
+  automergeType: "pr",
   // Vendored deps are refreshed by `task vendor` in the same PR, never by Renovate itself.
   ignorePaths: ["**/node_modules/**", "**/vendor/**"],
-  labels: ["dependencies"],
-  // Automerge is only as safe as the gate it waits on: these merges are held until
-  // `main` reports green, and testing.yaml fails a PR whose go.mod drifted from
-  // vendor/modules.txt ("inconsistent vendoring"). That only holds while
-  // `go test -count=1 -race ./...` is a required status check on main - see
-  // docs/renovate.md.
-  automergeType: "pr",
-  // Lockfile maintenance comes from :maintainLockFilesWeekly in config:best-practices.
-  // go.sum is refreshed by Renovate, but the vendored tree is not: it has to come from
-  // `task vendor`, so those PRs are flagged for the reviewer instead of silently merged.
-  postUpdateOptions: ["gomodTidy"],
   packageRules: [
-    // No automerge for Go: the repo builds from vendor/, which Renovate ignores. A merged
-    // go.mod/go.sum bump without a matching `task vendor` run leaves vendor/ stale and
-    // breaks the build, so Go bumps stay review-required PRs.
-    // One PR per bump level keeps diffs reviewable; majors are grouped separately because
-    // they routinely need code changes.
+    // The base preset groups by npm dep type, which does not exist for Go modules, so
+    // Go bumps would arrive one PR per dependency. Group them by bump level instead.
     {
       matchManagers: ["gomod", "golang-version"],
       matchUpdateTypes: ["minor", "patch", "pin"],
@@ -48,39 +27,20 @@
       groupName: "go modules (major)",
       groupSlug: "go-modules-major",
     },
-    {
-      matchDatasources: ["docker"],
-      matchFileNames: [
-        "**/Dockerfile",
-        "**/compose*.ya?ml",
-        "**/docker-compose*.ya?ml",
-      ],
-      groupName: "docker images",
-      groupSlug: "docker",
-      addLabels: ["docker"],
-    },
-    {
-      matchManagers: ["bun"],
-      matchUpdateTypes: ["patch", "minor", "pin", "digest"],
-      groupName: "js non-major",
-      groupSlug: "js-non-major",
-    },
-    {
-      matchManagers: ["bun"],
-      matchUpdateTypes: ["major"],
-      groupName: "js major",
-      groupSlug: "js-major",
-    },
   ],
-  regexManagers: [
-    // `version:`/`image:` pins in the local IdP playground compose files and the Traefik
-    // lab configs are real dependencies but live in no manifest, so the built-in managers
-    // never see them.
+  customManagers: [
+    // `image:` pins in the local IdP playground compose files are real dependencies but
+    // live in no manifest, so the built-in docker managers never see them.
     {
-      fileMatch: ["^workspaces/.*\\.ya?ml$", "^e2e/tests/.*docker-compose\\.ya?ml$"],
-      matchStrings: ["image:\\s*[\"']?(?<dep>[\\w./-]+:[\\w.-]+)[\"']?"],
+      customType: "regex",
+      managerFilePatterns: [
+        "/^workspaces\\/.*\\.ya?ml$/",
+        "/^e2e\\/tests\\/.*docker-compose\\.ya?ml$/",
+      ],
+      // Both groups are required: depName is the image repo, currentValue the tag. A
+      // regex manager yielding only depName (or only currentValue) is rejected outright.
+      matchStrings: ["image:\\s*[\"']?(?<depName>[\\w./-]+):(?<currentValue>[\\w.-]+)[\"']?"],
       datasourceTemplate: "docker",
-      depNameTemplate: "{{{ dep }}}",
     },
   ],
 }

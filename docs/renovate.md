@@ -1,12 +1,27 @@
 # Renovate
 
-Dependency updates are handled by Renovate, not Dependabot. Config lives in
-`.github/renovate.json5`; that file is the reference for what is updated and how.
+Dependency updates are handled by Renovate, not Dependabot.
+
+## Where the config lives
+
+Shared settings live in `https://github.com/BlackDark/renovate-base` (`default.json5`)
+and are pulled in with `github>blackdark/renovate-base//default.json5`. That base carries
+`config:best-practices`, action/docker digest pinning, automerge below major, the monthly
+schedule and dependency grouping.
+
+`.github/renovate.json5` holds only what is specific to this repo: Go grouping, the
+`vendor/` and `node_modules/` ignores, and the regex manager that picks up `image:` pins
+in the IdP playground compose files.
+
+Validate changes with the same tool CI uses:
+`renovate-config-validator --strict --no-global .github/renovate.json5`
+(`renovate-base` runs this on every `.json5` change in that repo; this repo has no
+equivalent workflow yet).
 
 ## Automerge is gated on branch protection
 
-`:automergeMinor` and `:automergeDigest` let Renovate merge every patch, minor, pin
-and digest bump without review. Major bumps always get a PR.
+Automerge below major (`:automergeMinor`, `:automergeDigest`) comes from the base preset,
+so it is governed from `renovate-base`, not from this file.
 
 That is only safe because a Renovate merge is held until `main` reports green. If
 `go test -count=1 -race ./...` stops being a required status check, Renovate starts
