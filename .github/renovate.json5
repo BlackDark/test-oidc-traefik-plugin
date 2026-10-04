@@ -13,12 +13,6 @@
       groupName: "go modules (non-major)",
       groupSlug: "go-modules-non-major",
     },
-    {
-      matchManagers: ["gomod", "golang-version"],
-      matchUpdateTypes: ["major"],
-      groupName: "go modules (major)",
-      groupSlug: "go-modules-major",
-    },
   ],
   customManagers: [
     // Compose-file `image:` pins that no manifest manager sees. The validator requires
