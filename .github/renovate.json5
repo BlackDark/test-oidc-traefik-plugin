@@ -1,9 +1,11 @@
 {
   $schema: "https://docs.renovatebot.com/renovate-schema.json",
+  // Superset of config:recommended: pins docker digests + action digests, weekly lockfile
+  // maintenance, abandoned-dep detection, and :configMigration (which will rename this
+  // file to renovate.json - JSON5 config files are deprecated).
   extends: [
-    "config:recommended",
+    "config:best-practices",
     "customManagers:githubActionsVersions",
-    "helpers:pinGitHubActionDigests",
     "schedule:weekly",
     ":dependencyDashboard",
     ":prConcurrentLimitNone",
@@ -13,7 +15,7 @@
   // Vendored deps are refreshed by `task vendor` in the same PR, never by Renovate itself.
   ignorePaths: ["**/node_modules/**", "**/vendor/**"],
   labels: ["dependencies"],
-  lockFileMaintenance: { enabled: true },
+  // Lockfile maintenance comes from :maintainLockFilesWeekly in config:best-practices.
   // go.sum is refreshed by Renovate, but the vendored tree is not: it has to come from
   // `task vendor`, so those PRs are flagged for the reviewer instead of silently merged.
   postUpdateOptions: ["gomodTidy"],
