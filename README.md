@@ -1,3 +1,5 @@
+> This repository is archived. Development continues at https://github.com/BlackDark/gatepost.
+
 # OIDC Auth: Traefik Middleware + Standalone ext_authz Service
 
 [![E2E Tests](https://img.shields.io/github/actions/workflow/status/BlackDark/test-oidc-traefik-plugin/.github%2Fworkflows%2Fe2e-tests.yml?logo=github&label=E2E%20Tests&color=green)](https://github.com/BlackDark/test-oidc-traefik-plugin/actions/workflows/e2e-tests.yml)

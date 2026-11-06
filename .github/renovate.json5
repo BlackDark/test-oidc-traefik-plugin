@@ -1,5 +1,6 @@
 {
   $schema: "https://docs.renovatebot.com/renovate-schema.json",
+  enabled: false,
   extends: ["github>blackdark/renovate-base//default.json5", ":pinVersions"],
   postUpdateOptions: ["gomodTidy"],
   automergeType: "pr",
