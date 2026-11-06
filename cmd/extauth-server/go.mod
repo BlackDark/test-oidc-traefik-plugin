@@ -1,6 +1,6 @@
 module github.com/BlackDark/test-oidc-traefik-plugin/cmd/extauth-server
 
-go 1.26.8
+go 1.26.10
 
 require (
 	github.com/BlackDark/test-oidc-traefik-plugin v0.21.1
